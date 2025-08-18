@@ -1,0 +1,49 @@
+<div id="view-ideation" class="view-content">
+                    <h2 class="text-4xl font-display mb-2">Fase 1: Ideazione</h2>
+                    <p id="ideation-premise" class="text-lg text-secondary mb-6"></p>
+                    
+                    <div id="ideation-tabs" class="border-b border-accent/20 mb-6">
+                        <nav class="flex space-x-4" aria-label="Tabs">
+                            <button data-tab="ideas-ai" class="ideation-tab-btn accent border-accent shrink-0 border-b-2 px-3 py-2 text-sm font-medium">Idee & IA</button>
+                            <button data-tab="characters" class="ideation-tab-btn text-secondary border-transparent shrink-0 border-b-2 px-3 py-2 text-sm font-medium hover:border-secondary">Personaggi</button>
+                            <button data-tab="worldbuilding" class="ideation-tab-btn text-secondary border-transparent shrink-0 border-b-2 px-3 py-2 text-sm font-medium hover:border-secondary">World-Building</button>
+                        </nav>
+                    </div>
+
+                    <div id="ideas-ai-content" class="ideation-tab-content">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div>
+                                <div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-display">Le Tue Idee</h3><button id="new-idea-btn" class="flex items-center text-sm px-3 py-1 bg-secondary text-primary font-bold rounded-lg hover:bg-accent hover:text-primary transition"><i data-lucide="plus" class="mr-1 h-4 w-4"></i>Aggiungi Idea</button></div>
+                                <div id="ideas-list" class="space-y-3 max-h-96 overflow-y-auto pr-2"></div>
+                            </div>
+                            <div class="bg-secondary p-6 rounded-xl border border-accent/20">
+                                <h3 class="text-2xl font-display mb-4">Assistente IA Gemini</h3>
+                                <textarea id="gemini-prompt" rows="4" class="w-full p-3 bg-primary rounded-lg border border-accent/30 focus:outline-none focus:ring-2 focus:ring-accent" placeholder="Es: 'Sviluppa la premessa: Un\'ambizione smodata porta alla rovina.'"></textarea>
+                                <button id="gemini-submit" class="mt-4 px-6 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover transition">Interroga l'IA</button>
+                                <div id="gemini-response-container" class="mt-6"><div id="gemini-response" class="p-4 bg-primary rounded-lg whitespace-pre-wrap text-secondary">Le risposte dell'IA appariranno qui...</div><button id="save-gemini-response-btn" class="hidden mt-2 text-sm accent hover:underline">Salva come idea</button></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="characters-content" class="ideation-tab-content hidden">
+                        <div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-display">Personaggi</h3><button id="new-character-btn" class="flex items-center text-sm px-3 py-1 bg-secondary text-primary font-bold rounded-lg hover:bg-accent hover:text-primary transition"><i data-lucide="plus" class="mr-1 h-4 w-4"></i>Aggiungi Personaggio</button></div>
+                        <div id="characters-list" class="space-y-3"></div>
+                    </div>
+
+                    <div id="worldbuilding-content" class="ideation-tab-content hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div>
+                                <div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-display">Luoghi</h3><button id="new-location-btn" class="flex items-center text-sm px-3 py-1 bg-secondary text-primary font-bold rounded-lg hover:bg-accent hover:text-primary transition"><i data-lucide="plus" class="mr-1 h-4 w-4"></i>Aggiungi Luogo</button></div>
+                                <div id="locations-list" class="space-y-3"></div>
+                            </div>
+                             <div>
+                                <div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-display">Oggetti Rilevanti</h3><button id="new-object-btn" class="flex items-center text-sm px-3 py-1 bg-secondary text-primary font-bold rounded-lg hover:bg-accent hover:text-primary transition"><i data-lucide="plus" class="mr-1 h-4 w-4"></i>Aggiungi Oggetto</button></div>
+                                <div id="objects-list" class="space-y-3"></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-4"><h3 class="text-2xl font-display">Sistemi</h3><button id="new-system-btn" class="flex items-center text-sm px-3 py-1 bg-secondary text-primary font-bold rounded-lg hover:bg-accent hover:text-primary transition"><i data-lucide="plus" class="mr-1 h-4 w-4"></i>Aggiungi Sistema</button></div>
+                                <div id="systems-list" class="space-y-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>

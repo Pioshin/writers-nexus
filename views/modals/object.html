@@ -1,0 +1,15 @@
+<div id="object-modal" class="modal-backdrop hidden">
+    <div class="bg-secondary w-full max-w-2xl rounded-2xl p-8 border border-accent/20 flex flex-col">
+        <h3 class="text-2xl font-display mb-4">Crea / Modifica Oggetto</h3>
+        <form id="object-form" class="flex-grow overflow-y-auto pr-4 space-y-3">
+            <input type="hidden" name="id" id="object-id">
+            <input id="obj-name" name="name" type="text" placeholder="Nome dell'oggetto" required class="w-full mb-2 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
+            <textarea id="obj-description" name="description" placeholder="Descrizione fisica, aspetto, materiale..." rows="4" class="w-full mb-2 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+            <textarea id="obj-importance" name="importance" placeholder="Importanza e ruolo nella trama" rows="4" class="w-full mb-2 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+        </form>
+        <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
+            <button type="button" id="cancel-object-modal" class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80">Annulla</button>
+            <button type="button" id="save-object-btn" class="px-6 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover">Salva Oggetto</button>
+        </div>
+    </div>
+</div>
