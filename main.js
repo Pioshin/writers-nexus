@@ -1,5 +1,6 @@
 import { DataManager } from './DataManager.js';
 import { FirebaseSync } from './FirebaseSync.js';
+import { ThemeManager } from './ThemeManager.js';
 
 // --- STATE ---
 let GEMINI_API_KEY = null;
@@ -33,9 +34,11 @@ async function initializeApp() {
     lucide.createIcons();
     setupEventListeners();
 
+    // Initialize ThemeManager
+    await ThemeManager.init(themeSelector);
+
     // Load settings and check for config
     const settings = await DataManager.getSettings();
-    await loadAndApplyConfig();
 
     // Load config modal initially (it's hidden by default)
     await loadModal('config');
@@ -81,7 +84,10 @@ function setupAuthObserver() {
             userInfoEl.style.display = 'flex';
             logoutBtn.style.display = 'block';
 
-            await loadAndApplyConfig();
+            // Re-apply theme in case it was changed while logged out
+            const settings = await DataManager.getSettings();
+            ThemeManager.applyTheme(settings.theme || 'scifi');
+
             switchView('dashboard');
         } else {
             // User is logged out
@@ -92,15 +98,13 @@ function setupAuthObserver() {
 }
 
 // --- CONFIGURATION ---
+// loadAndApplyConfig is no longer needed as theme is applied by ThemeManager
 async function loadAndApplyConfig() {
     const settings = await DataManager.getSettings();
     if (settings.geminiApiKey) {
         GEMINI_API_KEY = settings.geminiApiKey;
         FirebaseSync.setGeminiApiKey(settings.geminiApiKey);
     }
-    const savedTheme = settings.theme || 'scifi';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    if(themeSelector) themeSelector.value = savedTheme;
 }
 
 // --- EVENT LISTENERS ---
@@ -110,11 +114,7 @@ function setupEventListeners() {
         if (navItem && navItem.dataset.view) switchView(navItem.dataset.view);
     });
 
-    themeSelector.addEventListener('change', async (e) => {
-        const newTheme = e.target.value;
-        document.documentElement.setAttribute('data-theme', newTheme);
-        await DataManager.saveSettings({ theme: newTheme });
-    });
+    // Theme selector event listener is now in ThemeManager.js
 
     // Event listeners for modals (now handled by loadModal)
     showConfigBtn.addEventListener('click', () => loadModal('config', true));
