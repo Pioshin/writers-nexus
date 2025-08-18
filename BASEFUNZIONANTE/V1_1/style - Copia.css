@@ -1,0 +1,84 @@
+:root {
+    --font-main: 'Inter', sans-serif;
+    --font-display: 'Inter', sans-serif;
+}
+
+[data-theme="scifi"] {
+    --bg-primary: #0a0f1f;
+    --bg-secondary: #1a2035;
+    --text-primary: #e0e0ff;
+    --text-secondary: #a0a8c0;
+    --accent: #00ffff;
+    --accent-hover: #7fffff;
+    --font-display: 'Orbitron', sans-serif;
+    background-image: radial-gradient(circle at 1% 1%, #2a3045 1px, transparent 1px), radial-gradient(circle at 15% 25%, #2a3045 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+[data-theme="fantasy"] {
+    --bg-primary: #2c1e17;
+    --bg-secondary: #4a382e;
+    --text-primary: #e8d8c0;
+    --text-secondary: #b8a890;
+    --accent: #e4b970;
+    --accent-hover: #f8d49a;
+    --font-display: 'MedievalSharp', cursive;
+    background-image: url('https://www.transparenttextures.com/patterns/old-wall.png');
+}
+
+[data-theme="thriller"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2a2a2a;
+    --text-primary: #f0f0f0;
+    --text-secondary: #a0a0a0;
+    --accent: #ff0000;
+    --accent-hover: #ff4d4d;
+    --font-display: 'Special Elite', cursive;
+    background-image: url('https://www.transparenttextures.com/patterns/subtle-grunge.png');
+}
+
+[data-theme="romance"] {
+    --bg-primary: #fff0f5;
+    --bg-secondary: #ffe4e1;
+    --text-primary: #5c3b47;
+    --text-secondary: #8c6b77;
+    --accent: #e91e63;
+    --accent-hover: #f06292;
+    --font-display: 'Dancing Script', cursive;
+    background-image: url('https://www.transparenttextures.com/patterns/gplay.png');
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    transition: background-color 0.5s, color 0.5s;
+}
+
+.font-display { font-family: var(--font-display); }
+.bg-primary { background-color: var(--bg-primary); }
+.bg-secondary { background-color: var(--bg-secondary); }
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.accent { color: var(--accent); }
+.border-accent { border-color: var(--accent); }
+.bg-accent { background-color: var(--accent); }
+.hover\:bg-accent-hover:hover { background-color: var(--accent-hover); }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-hover); }
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
