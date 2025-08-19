@@ -1,5 +1,21 @@
-<div id="view-writing" class="view-content">
-    <div class="border-b border-accent/20 mb-6 pb-4">
-        <h2 class="text-4xl font-display">Scrittura</h2>
+<div id="view-writing" class="view-content p-8 flex flex-col h-full">
+    <div class="border-b border-accent/20 mb-4 pb-4">
+        <div class="flex justify-between items-center">
+            <div>
+                <button id="back-to-structure-btn" class="flex items-center text-sm text-secondary hover:text-accent mb-2">
+                    <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>
+                    Torna alla Struttura
+                </button>
+                <h2 id="writing-scene-title" class="text-4xl font-display">Scrittura Scena</h2>
+            </div>
+            <div id="writing-stats" class="text-right">
+                <p class="text-secondary">Conteggio parole</p>
+                <p id="word-count" class="text-2xl font-bold">0</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="writing-editor-container" class="flex-grow flex flex-col">
+        <textarea id="writing-editor" class="w-full h-full bg-primary p-4 rounded-lg border border-border-color focus:outline-none focus:ring-2 focus:ring-accent resize-none text-lg leading-relaxed"></textarea>
     </div>
 </div>

@@ -1,0 +1,42 @@
+import { DataManager } from '../../DataManager.js';
+
+let modal, form, cancelBtn, contentInput;
+
+function init() {
+    modal = document.getElementById('new-idea-modal');
+    form = document.getElementById('new-idea-form');
+    cancelBtn = document.getElementById('cancel-idea-modal');
+    contentInput = document.getElementById('new-idea-content');
+
+    cancelBtn.addEventListener('click', close);
+    form.addEventListener('submit', save);
+}
+
+function open() {
+    form.reset();
+    modal.classList.remove('hidden');
+}
+
+function close() {
+    modal.classList.add('hidden');
+}
+
+async function save(e) {
+    e.preventDefault();
+    const content = contentInput.value.trim();
+    if (!content) return;
+
+    const currentProjectId = await DataManager.getCurrentProjectId();
+    if (!currentProjectId) {
+        alert("Nessun progetto selezionato.");
+        return;
+    }
+
+    await DataManager.saveProjectItem(currentProjectId, 'ideas', { content });
+    
+    document.dispatchEvent(new CustomEvent('idea-saved'));
+
+    close();
+}
+
+export default { init, open, close };

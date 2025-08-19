@@ -1,5 +1,58 @@
-<div id="view-structure" class="view-content">
+<div id="view-structure" class="view-content p-8">
     <div class="border-b border-accent/20 mb-6 pb-4">
-        <h2 class="text-4xl font-display">Struttura</h2>
+        <h2 class="text-4xl font-display">Struttura della Trama</h2>
+        <p class="text-lg text-secondary">Organizza la tua storia seguendo le tappe del Viaggio dell'Eroe.</p>
+    </div>
+
+    <div id="structure-container" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        
+        <!-- Atto 1 -->
+        <div id="act-1" class="bg-secondary/50 p-4 rounded-lg border border-border-color">
+            <h3 class="text-2xl font-display accent text-center mb-4">Atto I: Partenza</h3>
+            <div id="act-1-stages" class="space-y-4"></div>
+        </div>
+
+        <!-- Atto 2 -->
+        <div id="act-2" class="bg-secondary/50 p-4 rounded-lg border border-border-color">
+            <h3 class="text-2xl font-display accent text-center mb-4">Atto II: Iniziazione</h3>
+            <div id="act-2-stages" class="space-y-4"></div>
+        </div>
+
+        <!-- Atto 3 -->
+        <div id="act-3" class="bg-secondary/50 p-4 rounded-lg border border-border-color">
+            <h3 class="text-2xl font-display accent text-center mb-4">Atto III: Ritorno</h3>
+            <div id="act-3-stages" class="space-y-4"></div>
+        </div>
+
     </div>
 </div>
+
+<!-- Template per una Tappa (Stage) -->
+<template id="stage-template">
+    <div class="stage-container bg-primary p-4 rounded-md border border-border-color/50">
+        <div class="flex justify-between items-center">
+            <h4 class="text-lg font-bold text-text-primary stage-title"></h4>
+            <div class="flex items-center gap-2">
+                <button class="toggle-scenes-btn p-1 hover:text-accent">
+                    <i data-lucide="chevrons-up-down" class="w-4 h-4"></i>
+                </button>
+                <button class="add-scene-btn p-1 hover:text-accent">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+        <div class="scenes-list mt-3 space-y-2 hidden"></div>
+    </div>
+</template>
+
+<!-- Template per una Scena -->
+<template id="scene-card-template">
+    <div class="scene-card bg-secondary p-3 rounded shadow-md cursor-pointer" draggable="true">
+        <p class="font-semibold scene-title"></p>
+        <p class="text-sm text-text-secondary scene-synopsis mt-1"></p>
+        <div class="flex justify-end gap-2 mt-2">
+            <button class="edit-scene-btn p-1 hover:text-accent"><i data-lucide="file-edit" class="w-4 h-4"></i></button>
+            <button class="delete-scene-btn p-1 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        </div>
+    </div>
+</template>

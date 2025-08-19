@@ -198,7 +198,7 @@ async function switchView(viewName) {
 
         const module = await import(`./views/${viewName}/${viewName}.js`);
         if (module.default && typeof module.default.init === 'function') {
-            module.default.init(DataManager, isOfflineMode ? null : FirebaseSync, loadModal);
+            module.default.init(DataManager, isOfflineMode ? null : FirebaseSync, loadModal, switchView);
         }
         
         lucide.createIcons();
