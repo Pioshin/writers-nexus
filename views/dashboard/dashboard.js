@@ -1,4 +1,14 @@
 let DataManager, FirebaseSync, loadModal;
+let newProjectModal = null;
+
+async function handleNewProjectClick() {
+    if (!newProjectModal) {
+        newProjectModal = await loadModal('new-project');
+    }
+    if (newProjectModal) {
+        newProjectModal.open();
+    }
+}
 
 export default {
     init: function(dataManager, firebaseSync, modalLoader) {
@@ -6,11 +16,12 @@ export default {
         FirebaseSync = firebaseSync;
         loadModal = modalLoader;
 
-        document.getElementById('new-project-btn').addEventListener('click', () => {
-            loadModal('new-project', true);
-        });
+        const newProjectBtn = document.getElementById('new-project-btn');
+        if (newProjectBtn) {
+            newProjectBtn.addEventListener('click', handleNewProjectClick);
+        }
 
-        // Placeholder for loading projects
+        // TODO: Implementare il caricamento dinamico dei progetti
         // loadProjects();
     }
 };

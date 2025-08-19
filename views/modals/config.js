@@ -1,52 +1,59 @@
 import { DataManager } from '../../DataManager.js';
-import { FirebaseSync } from '../../FirebaseSync.js';
 
-let configModal, configForm, saveConfigBtn, cancelConfigModalBtn, geminiApiKeyInput, firebaseConfigTextarea, configJsonError;
+let modal, form, saveBtn, cancelBtn, geminiApiKeyInput, firebaseConfigTextarea, jsonError;
 
-async function openConfigModal() {
+function init() {
+    modal = document.getElementById('config-modal');
+    form = document.getElementById('config-form');
+    saveBtn = document.getElementById('save-config-btn');
+    cancelBtn = document.getElementById('cancel-config-modal');
+    geminiApiKeyInput = document.getElementById('config-geminiApiKey');
+    firebaseConfigTextarea = document.getElementById('config-firebase-json');
+    jsonError = document.getElementById('config-json-error');
+
+    cancelBtn.addEventListener('click', close);
+    saveBtn.addEventListener('click', save);
+}
+
+async function open() {
     const settings = await DataManager.getSettings();
     geminiApiKeyInput.value = settings.geminiApiKey || '';
-    firebaseConfigTextarea.value = settings.firebaseConfig ? JSON.stringify(settings.firebaseConfig, null, 2) : '';
-    configModal.classList.remove('hidden');
+    if (settings.firebaseConfig) {
+        firebaseConfigTextarea.value = JSON.stringify(settings.firebaseConfig, null, 2);
+    }
+    jsonError.textContent = '';
+    modal.classList.remove('hidden');
 }
 
-function closeConfigModal() {
-    configModal.classList.add('hidden');
+function close() {
+    modal.classList.add('hidden');
 }
 
-async function saveConfig() {
-    const geminiKey = geminiApiKeyInput.value;
-    const firebaseConfigStr = firebaseConfigTextarea.value;
+async function save() {
+    const geminiKey = geminiApiKeyInput.value.trim();
+    const firebaseConfigStr = firebaseConfigTextarea.value.trim();
     let firebaseConfig;
+
+    jsonError.textContent = '';
 
     if (firebaseConfigStr) {
         try {
             firebaseConfig = JSON.parse(firebaseConfigStr);
-            await DataManager.saveSettings({ firebaseConfig });
         } catch (e) {
-            configJsonError.textContent = 'JSON non valido.';
+            jsonError.textContent = 'Errore: Il JSON di Firebase non è valido.';
             return;
         }
     }
 
-    await DataManager.saveSettings({ geminiApiKey: geminiKey });
-    FirebaseSync.setGeminiApiKey(geminiKey);
+    await DataManager.saveSettings({ 
+        geminiApiKey: geminiKey,
+        firebaseConfig: firebaseConfig // Sarà undefined se la stringa è vuota, che è ok
+    });
 
-    closeConfigModal();
-    location.reload(); // Reload to apply new settings
+    close();
+    // Mostra un messaggio di ricarica
+    alert('Configurazione salvata. La pagina verrà ricaricata per applicare le modifiche.');
+    location.reload();
 }
 
-export function init(showConfigBtn, sidebarSettingsBtn) {
-    configModal = document.getElementById('config-modal');
-    configForm = document.getElementById('config-form');
-    saveConfigBtn = document.getElementById('save-config-btn');
-    cancelConfigModalBtn = document.getElementById('cancel-config-modal');
-    geminiApiKeyInput = document.getElementById('config-geminiApiKey');
-    firebaseConfigTextarea = document.getElementById('config-firebase-json');
-    configJsonError = document.getElementById('config-json-error');
-
-    showConfigBtn.addEventListener('click', openConfigModal);
-    sidebarSettingsBtn.addEventListener('click', openConfigModal);
-    cancelConfigModalBtn.addEventListener('click', closeConfigModal);
-    saveConfigBtn.addEventListener('click', saveConfig);
-}
+export default { init, open, close };
