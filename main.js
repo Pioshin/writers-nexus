@@ -210,29 +210,38 @@ async function switchView(viewName) {
 }
 
 async function loadModal(modalName) {
-    // Evita di ricaricare un modale se è già nel DOM
-    if (document.getElementById(`${modalName}-modal`)) {
-        // Trova il modulo già caricato se necessario (logica più complessa, per ora non serve)
-        // In questo caso, i moduli dei modali non esportano funzioni che devono essere richiamate
-        // dopo l'inizializzazione, quindi possiamo semplicemente uscire.
-        return; 
+    const modalId = `${modalName}-modal`;
+    let module;
+
+    // Prova a vedere se il modulo è già stato caricato in qualche modo (es. in un registro)
+    // Per ora, ci basiamo sulla presenza dell'elemento nel DOM e assumiamo che il modulo sia caricato
+    if (document.getElementById(modalId)) {
+        try {
+            // Re-importa per ottenere l'oggetto del modulo con le sue esportazioni
+            module = await import(`./views/modals/${modalName}.js`);
+            return module.default;
+        } catch (e) {
+            console.error(`Failed to re-import modal module: ${modalName}`, e);
+            return null;
+        }
     }
 
     try {
         const response = await fetch(`views/modals/${modalName}.html`);
-        if (!response.ok) throw new Error(`Could not load modal: ${modalName}`);
+        if (!response.ok) throw new Error(`Could not load modal HTML: ${modalName}`);
+        
         const modalContent = document.createElement('div');
         modalContent.innerHTML = await response.text();
-        modalContainer.appendChild(modalContent);
+        modalContainer.appendChild(modalContent.firstElementChild);
 
-        const module = await import(`./views/modals/${modalName}.js`);
+        module = await import(`./views/modals/${modalName}.js`);
         if (module.default && typeof module.default.init === 'function') {
-            module.default.init();
+            module.default.init(DataManager, loadModal, switchView); // Passa le dipendenze necessarie
             return module.default;
         }
         return null;
     } catch (error) {
-        console.error("Error loading modal:", error);
+        console.error(`Error loading modal: ${modalName}`, error);
         return null;
     }
 }

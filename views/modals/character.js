@@ -1,41 +1,60 @@
 import { DataManager } from '../../DataManager.js';
 
-let modal, form, saveBtn, cancelBtn, modalTitle;
-let charIdInput, charNameInput, charRoleInput, charAppearanceInput, charPsychologyInput, charPastInput, charVoiceInput;
+const NARRATIVE_TAGS = {
+    archetype: ['eroe', 'mentore', 'ombra', 'alleato', 'guardiano della soglia', 'messaggero', 'mutafaccia'],
+    role: ['protagonista', 'antagonista', 'deuteragonista', 'secondario']
+};
+
+let modal, form, modalTitle, saveBtn, cancelBtn;
+let characterIdInput, nameInput, roleInput, appearanceInput, psychologyInput, pastInput, voiceInput, archetypeSelect, narrativeRoleSelect;
 
 function init() {
     modal = document.getElementById('character-modal');
     form = document.getElementById('character-form');
+    modalTitle = document.getElementById('character-modal-title');
     saveBtn = document.getElementById('save-character-btn');
     cancelBtn = document.getElementById('cancel-character-btn');
-    modalTitle = document.getElementById('character-modal-title');
 
-    // Form fields
-    charIdInput = document.getElementById('character-id');
-    charNameInput = document.getElementById('char-name');
-    charRoleInput = document.getElementById('char-role');
-    charAppearanceInput = document.getElementById('char-appearance');
-    charPsychologyInput = document.getElementById('char-psychology');
-    charPastInput = document.getElementById('char-past');
-    charVoiceInput = document.getElementById('char-voice');
+    characterIdInput = document.getElementById('character-id');
+    nameInput = document.getElementById('character-name');
+    roleInput = document.getElementById('character-role');
+    appearanceInput = document.getElementById('character-appearance');
+    psychologyInput = document.getElementById('character-psychology');
+    pastInput = document.getElementById('character-past');
+    voiceInput = document.getElementById('character-voice');
+    archetypeSelect = document.getElementById('character-archetype');
+    narrativeRoleSelect = document.getElementById('character-narrative-role');
+
+    populateSelects();
 
     cancelBtn.addEventListener('click', close);
     saveBtn.addEventListener('click', save);
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
         save();
     });
 }
 
+function populateSelects() {
+    NARRATIVE_TAGS.archetype.forEach(tag => {
+        archetypeSelect.add(new Option(tag.charAt(0).toUpperCase() + tag.slice(1), tag));
+    });
+    NARRATIVE_TAGS.role.forEach(tag => {
+        narrativeRoleSelect.add(new Option(tag.charAt(0).toUpperCase() + tag.slice(1), tag));
+    });
+}
+
 function open(character = {}) {
     form.reset();
-    charIdInput.value = character.id || '';
-    charNameInput.value = character.name || '';
-    charRoleInput.value = character.role || '';
-    charAppearanceInput.value = character.appearance || '';
-    charPsychologyInput.value = character.psychology || '';
-    charPastInput.value = character.past || '';
-    charVoiceInput.value = character.voice || '';
+    characterIdInput.value = character.id || '';
+    nameInput.value = character.name || '';
+    roleInput.value = character.role || '';
+    appearanceInput.value = character.appearance || '';
+    psychologyInput.value = character.psychology || '';
+    pastInput.value = character.past || '';
+    voiceInput.value = character.voice || '';
+    archetypeSelect.value = character.archetype || '';
+    narrativeRoleSelect.value = character.narrativeRole || '';
 
     modalTitle.textContent = character.id ? 'Modifica Personaggio' : 'Crea Nuovo Personaggio';
     modal.classList.remove('hidden');
@@ -47,13 +66,15 @@ function close() {
 
 async function save() {
     const characterData = {
-        id: charIdInput.value || undefined,
-        name: charNameInput.value.trim(),
-        role: charRoleInput.value.trim(),
-        appearance: charAppearanceInput.value.trim(),
-        psychology: charPsychologyInput.value.trim(),
-        past: charPastInput.value.trim(),
-        voice: charVoiceInput.value.trim(),
+        id: characterIdInput.value || undefined,
+        name: nameInput.value.trim(),
+        role: roleInput.value.trim(),
+        appearance: appearanceInput.value.trim(),
+        psychology: psychologyInput.value.trim(),
+        past: pastInput.value.trim(),
+        voice: voiceInput.value.trim(),
+        archetype: archetypeSelect.value,
+        narrativeRole: narrativeRoleSelect.value
     };
 
     if (!characterData.name) {

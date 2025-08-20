@@ -1,40 +1,54 @@
 <div id="character-modal" class="modal-backdrop hidden">
-    <div class="bg-secondary w-full max-w-4xl h-[90vh] rounded-2xl p-8 border border-accent/20 flex flex-col">
-        <h3 id="character-modal-title" class="text-2xl font-display mb-4">Crea Personaggio</h3>
-        <form id="character-form" class="flex-grow overflow-y-auto pr-4 grid grid-cols-1 md:grid-cols-2 gap-x-8">
+    <div class="bg-secondary w-full max-w-3xl rounded-2xl p-8 border border-accent/20 flex flex-col">
+        <h3 id="character-modal-title" class="text-2xl font-display mb-6">Crea/Modifica Personaggio</h3>
+        <form id="character-form" class="flex-grow overflow-y-auto pr-4 space-y-4">
             <input type="hidden" id="character-id">
-            
-            <!-- Colonna Sinistra -->
-            <div class="space-y-4">
-                <div>
-                    <label for="char-name" class="text-sm font-semibold text-secondary">Nome completo</label>
-                    <input id="char-name" type="text" placeholder="Nome del personaggio" required class="w-full mt-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="form-group">
+                    <label for="character-name" class="text-sm font-semibold text-secondary">Nome Personaggio</label>
+                    <input id="character-name" type="text" placeholder="Es: Kenla Quilah" required class="w-full mt-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
                 </div>
-                <div>
-                    <label for="char-role" class="text-sm font-semibold text-secondary">Ruolo / Professione</label>
-                    <input id="char-role" type="text" placeholder="Es: Detective, Contrabbandiere, Erede al trono" class="w-full mt-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
-                </div>
-                <div>
-                    <label for="char-psychology" class="text-sm font-semibold text-secondary">Psicologia Profonda</label>
-                    <textarea id="char-psychology" placeholder="Desideri, paure, bisogno interiore, valori, contraddizioni..." rows="8" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+                <div class="form-group">
+                    <label for="character-role" class="text-sm font-semibold text-secondary">Ruolo/Professione</label>
+                    <input id="character-role" type="text" placeholder="Es: Comandante" class="w-full mt-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
                 </div>
             </div>
 
-            <!-- Colonna Destra -->
-            <div class="space-y-4">
-                 <div>
-                    <label for="char-appearance" class="text-sm font-semibold text-secondary">Aspetto e Comportamento</label>
-                    <textarea id="char-appearance" placeholder="Fisicità, linguaggio del corpo, stile, segni distintivi..." rows="5" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+            <div class="form-group">
+                <label for="character-appearance" class="text-sm font-semibold text-secondary">Aspetto</label>
+                <textarea id="character-appearance" placeholder="Descrivi l'aspetto fisico del personaggio..." rows="3" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="character-psychology" class="text-sm font-semibold text-secondary">Psicologia</label>
+                <textarea id="character-psychology" placeholder="Descrivi la personalità, i valori, le paure..." rows="3" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div class="form-group">
+                    <label for="character-past" class="text-sm font-semibold text-secondary">Passato</label>
+                    <textarea id="character-past" placeholder="Eventi chiave del suo passato..." rows="3" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
                 </div>
-                <div>
-                    <label for="char-past" class="text-sm font-semibold text-secondary">Passato Significativo</label>
-                    <textarea id="char-past" placeholder="Eventi chiave, traumi, successi che hanno forgiato il personaggio..." rows="5" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
-                </div>
-                 <div>
-                    <label for="char-voice" class="text-sm font-semibold text-secondary">Voce e Comunicazione</label>
-                    <textarea id="char-voice" placeholder="Tono, ritmo, registro linguistico, intercalari, canale rappresentazionale (V, A, K)..." rows="5" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
+                <div class="form-group">
+                    <label for="character-voice" class="text-sm font-semibold text-secondary">Voce e Linguaggio</label>
+                    <textarea id="character-voice" placeholder="Tono di voce, slang, frasi tipiche..." rows="3" class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
                 </div>
             </div>
+
+            <div class="form-group">
+                <label class="text-sm font-semibold text-secondary">Tags Narrativi</label>
+                <div class="flex flex-wrap gap-4 mt-2">
+                    <select id="character-archetype" class="flex-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
+                        <option value="">Nessun Archetipo</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                    <select id="character-narrative-role" class="flex-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
+                        <option value="">Nessun Ruolo Narrativo</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+            </div>
+
         </form>
         <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
             <button type="button" id="cancel-character-btn" class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80">Annulla</button>

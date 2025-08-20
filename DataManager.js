@@ -152,7 +152,19 @@ Object.assign(DataManager, {
     async syncOnClose() {if (!firebaseSync || !(await firebaseSync.checkConnection())) return;const remoteTs = await firebaseSync.getRemoteTimestamps();const localData = await getAllLocalData();const comparison = this._compareTimestamps(localData, remoteTs);if (comparison.status === 'LOCAL_NEWER') {console.log("Syncing on close: local data is newer, uploading.");await firebaseSync.uploadData(this);}},
     async getProjects() { const db = await getDb(); return db.getAll('projects'); },
     async getProject(id) { const db = await getDb(); return db.get('projects', id); },
-    async saveProject(projectData) {const db = await getDb();const id = projectData.id || generateId('proj');const now = Date.now();const project = { ...projectData, id, lastModified: now };if (!project.createdAt) project.createdAt = now;await db.put('projects', project);return project;},
+    async saveProject(projectData) {
+        const db = await getDb();
+        const id = projectData.id || generateId('proj');
+        const now = Date.now();
+        const project = { ...projectData, id, lastModified: now };
+        if (!project.createdAt) {
+            project.createdAt = now;
+        }
+        await db.put('projects', project);
+        // Aggiorna anche il progetto corrente nelle impostazioni
+        await this.setCurrentProjectId(id);
+        return project;
+    },
     async getProjectItems(projectId, itemType) { const db = await getDb(); return db.getAllFromIndex(itemType, 'by_projectId', projectId); },
     async saveProjectItem(projectId, itemType, itemData) {const db = await getDb();const id = itemData.id || generateId(itemType.slice(0, 4));const now = Date.now();const item = { ...itemData, id, projectId, lastModified: now };if (!item.createdAt) item.createdAt = now;await db.put(itemType, item);return item;},
     async deleteProjectItem(itemType, itemId) { const db = await getDb(); await db.delete(itemType, itemId); }

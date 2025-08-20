@@ -51,7 +51,7 @@ async function loadProjects() {
 
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'absolute top-3 right-3 p-1 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity';
-        deleteBtn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i>`;
+        deleteBtn.innerHTML = `<i data-lucide='trash-2' class='w-4 h-4'></i>`;
         deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             deleteProject(project.id, card);
