@@ -1,6 +1,7 @@
 import { DataManager } from '../../DataManager.js';
 
 let modal, form, cancelBtn, contentInput;
+let currentEditingIdeaId = null;
 
 function init() {
     modal = document.getElementById('new-idea-modal');
@@ -12,13 +13,16 @@ function init() {
     form.addEventListener('submit', save);
 }
 
-function open() {
+function open(idea = null) {
     form.reset();
+    currentEditingIdeaId = idea && idea.id ? idea.id : null;
+    if (idea && idea.content) contentInput.value = idea.content;
     modal.classList.remove('hidden');
 }
 
 function close() {
     modal.classList.add('hidden');
+    currentEditingIdeaId = null;
 }
 
 async function save(e) {
@@ -32,7 +36,8 @@ async function save(e) {
         return;
     }
 
-    await DataManager.saveProjectItem(currentProjectId, 'ideas', { content });
+    const payload = currentEditingIdeaId ? { id: currentEditingIdeaId, content } : { content };
+    await DataManager.saveProjectItem(currentProjectId, 'ideas', payload);
     
     document.dispatchEvent(new CustomEvent('idea-saved'));
 

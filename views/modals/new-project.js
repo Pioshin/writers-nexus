@@ -1,41 +1,89 @@
-import { DataManager } from '../../DataManager.js';
-
+let DataManager;
 let modal, form, cancelBtn, titleInput, premiseInput;
+let resolvePromise, rejectPromise;
+let currentEditingProjectId = null;
 
-function init() {
-    modal = document.getElementById('new-project-modal');
-    form = document.getElementById('new-project-form');
-    cancelBtn = document.getElementById('cancel-project-modal');
-    titleInput = document.getElementById('new-project-title');
-    premiseInput = document.getElementById('new-project-premise');
-
-    cancelBtn.addEventListener('click', close);
-    form.addEventListener('submit', save);
-}
-
-function open() {
-    form.reset();
-    modal.classList.remove('hidden');
-}
-
-function close() {
-    modal.classList.add('hidden');
-}
-
-async function save(e) {
+async function handleFormSubmit(e) {
     e.preventDefault();
     const title = titleInput.value.trim();
     const premise = premiseInput.value.trim();
 
     if (!title) return;
 
-    const newProject = await DataManager.saveProject({ title, premise });
-    await DataManager.setCurrentProjectId(newProject.id);
+    // Reset previous errors
+    const errorEl = document.getElementById('new-project-error');
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
 
+    try {
+        const payload = currentEditingProjectId ? { id: currentEditingProjectId, title, premise } : { title, premise };
+        const newProject = await DataManager.saveProject(payload);
+        close();
+        if (resolvePromise) {
+            resolvePromise(newProject);
+        }
+    } catch (error) {
+        errorEl.textContent = error.message;
+        errorEl.classList.remove('hidden');
+        if (rejectPromise) {
+            // We don't reject the promise here because the modal stays open for correction
+            // rejectPromise(error); 
+        }
+    }
+}
+
+function handleCancel() {
     close();
-    // Ricarica l'app per mostrare il nuovo progetto come attivo
-    // Una soluzione più elegante sarebbe un pub/sub o un event emitter
-    window.location.reload(); 
+    if (rejectPromise) {
+        rejectPromise(new Error('Modal cancelled'));
+    }
+}
+
+function open(project = null) {
+    form.reset();
+    currentEditingProjectId = project && project.id ? project.id : null;
+
+    // Dynamic title and button label
+    const titleEl = modal.querySelector('h3');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (currentEditingProjectId) {
+        titleEl.textContent = 'Modifica Progetto';
+        submitBtn.textContent = 'Salva';
+        titleInput.value = project.title || '';
+        premiseInput.value = project.premise || '';
+    } else {
+        titleEl.textContent = 'Crea un Nuovo Progetto';
+        submitBtn.textContent = 'Crea';
+    }
+
+    modal.classList.remove('hidden');
+
+    form.addEventListener('submit', handleFormSubmit);
+    cancelBtn.addEventListener('click', handleCancel);
+
+    return new Promise((resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
+    });
+}
+
+function close() {
+    modal.classList.add('hidden');
+    form.removeEventListener('submit', handleFormSubmit);
+    cancelBtn.removeEventListener('click', handleCancel);
+    resolvePromise = null;
+    rejectPromise = null;
+    currentEditingProjectId = null;
+}
+
+function init(dataManager) {
+    DataManager = dataManager;
+    
+    modal = document.getElementById('new-project-modal');
+    form = document.getElementById('new-project-form');
+    cancelBtn = document.getElementById('cancel-project-modal');
+    titleInput = document.getElementById('new-project-title');
+    premiseInput = document.getElementById('new-project-premise');
 }
 
 export default { init, open, close };

@@ -105,6 +105,14 @@ export const DataManager = {
             }
         }
         await tx.done;
+        // Se il progetto cancellato era quello corrente, azzera le impostazioni correnti
+        const settings = await this.getSettings();
+        if (settings.currentProjectId === id) {
+            await this.saveSettings({ currentProjectId: null, currentSceneId: null });
+        }
+
+        // Dispatch change event
+        window.dispatchEvent(new CustomEvent('datachanged', { detail: { storeName: 'projects' } }));
     },
 
     async getSettings() {
@@ -121,6 +129,10 @@ export const DataManager = {
         const currentSettings = await this.getSettings();
         const newSettings = { ...currentSettings, ...settingsData, id: 'user_settings', lastModified: Date.now() };
         await db.put('settings', newSettings);
+        
+        // Dispatch change event
+        window.dispatchEvent(new CustomEvent('settingschanged', { detail: { newSettings } }));
+
         return newSettings;
     },
 
@@ -154,6 +166,13 @@ Object.assign(DataManager, {
     async getProject(id) { const db = await getDb(); return db.get('projects', id); },
     async saveProject(projectData) {
         const db = await getDb();
+        
+        // Check for duplicates
+        const allProjects = await this.getProjects();
+        if (allProjects.some(p => p.title.toLowerCase() === projectData.title.toLowerCase() && p.id !== projectData.id)) {
+            throw new Error('A project with this title already exists.');
+        }
+
         const id = projectData.id || generateId('proj');
         const now = Date.now();
         const project = { ...projectData, id, lastModified: now };
@@ -161,6 +180,10 @@ Object.assign(DataManager, {
             project.createdAt = now;
         }
         await db.put('projects', project);
+        
+        // Dispatch change event
+        window.dispatchEvent(new CustomEvent('datachanged', { detail: { storeName: 'projects' } }));
+
         // Aggiorna anche il progetto corrente nelle impostazioni
         await this.setCurrentProjectId(id);
         return project;

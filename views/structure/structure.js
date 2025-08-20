@@ -103,17 +103,19 @@ function createSceneCard(scene) {
     cardEl.querySelector('.scene-title').textContent = scene.title;
     cardEl.querySelector('.scene-synopsis').textContent = scene.synopsis;
 
-    cardEl.querySelector('.edit-scene-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        sceneEditorModal.open({ scene });
-    });
-
-    cardEl.querySelector('.delete-scene-btn').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (confirm(`Sei sicuro di voler eliminare la scena "${scene.title}"?`)) {
-            await DataManager.deleteScene(scene.id);
-            cardEl.remove();
-        }
+    // Overlay condiviso
+    import('../shared/overlay.js').then(({ addOverlayTo }) => {
+        addOverlayTo(cardEl, {
+            positionClass: 'absolute top-2 right-2',
+            onEdit: () => sceneEditorModal.open({ scene }),
+            onDelete: async () => {
+                if (confirm(`Sei sicuro di voler eliminare la scena "${scene.title}"?`)) {
+                    await DataManager.deleteScene(scene.id);
+                    cardEl.remove();
+                }
+            }
+        });
+        lucide.createIcons();
     });
     
     cardEl.addEventListener('click', async () => {

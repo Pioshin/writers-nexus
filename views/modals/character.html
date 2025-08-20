@@ -1,5 +1,5 @@
 <div id="character-modal" class="modal-backdrop hidden">
-    <div class="bg-secondary w-full max-w-3xl rounded-2xl p-8 border border-accent/20 flex flex-col">
+    <div class="bg-secondary w-full max-w-3xl rounded-2xl p-8 border border-accent/20 flex flex-col" style="max-height: 90vh;">
         <h3 id="character-modal-title" class="text-2xl font-display mb-6">Crea/Modifica Personaggio</h3>
         <form id="character-form" class="flex-grow overflow-y-auto pr-4 space-y-4">
             <input type="hidden" id="character-id">
@@ -37,20 +37,29 @@
 
             <div class="form-group">
                 <label class="text-sm font-semibold text-secondary">Tags Narrativi</label>
-                <div class="flex flex-wrap gap-4 mt-2">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                     <select id="character-archetype" class="flex-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
                         <option value="">Nessun Archetipo</option>
-                        <!-- Options will be populated by JS -->
                     </select>
                     <select id="character-narrative-role" class="flex-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
                         <option value="">Nessun Ruolo Narrativo</option>
-                        <!-- Options will be populated by JS -->
+                    </select>
+                    <select id="character-importance" class="flex-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
+                        <option value="">Nessuna Importanza</option>
                     </select>
                 </div>
             </div>
 
+            <div class="form-group">
+                <label class="text-sm font-semibold text-secondary">Relazioni</label>
+                <div id="character-relations-editor" class="mt-2 space-y-2">
+                    <!-- Relationship rows will be added here by JS -->
+                </div>
+                <button type="button" id="add-relation-btn" class="mt-2 px-4 py-2 text-sm bg-accent/20 text-accent font-semibold rounded-lg hover:bg-accent/30">+ Aggiungi Relazione</button>
+            </div>
+
         </form>
-        <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
+        <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20 flex-shrink-0">
             <button type="button" id="cancel-character-btn" class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80">Annulla</button>
             <button type="button" id="save-character-btn" class="px-6 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover">Salva Personaggio</button>
         </div>

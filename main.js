@@ -8,7 +8,7 @@ let syncModal = null;
 let configModal = null;
 
 // --- DOM ELEMENT VARIABLES ---
-let authScreen, appScreen, mainNav, mainContentArea, themeSelector, showConfigBtn, sidebarSettingsBtn, loginForm, logoutBtn, userEmailEl, loginSubmitBtn, authErrorEl, userInfoEl, configStatusEl, modalContainer;
+let authScreen, appScreen, mainNav, mainContentArea, themeSelector, showConfigBtn, sidebarSettingsBtn, loginForm, logoutBtn, userEmailEl, loginSubmitBtn, authErrorEl, userInfoEl, configStatusEl, modalContainer, currentProjectNameEl;
 
 // --- UI NOTIFIER ---
 const uiNotifier = {
@@ -82,6 +82,7 @@ async function initializeApp() {
     userInfoEl = document.getElementById('user-info');
     configStatusEl = document.getElementById('config-status');
     modalContainer = document.getElementById('modal-container');
+    currentProjectNameEl = document.getElementById('current-project-name');
 
     await ThemeManager.init(themeSelector);
     const settings = await DataManager.getSettings();
@@ -92,6 +93,9 @@ async function initializeApp() {
 
     setupEventListeners();
     DataManager.init(FirebaseSync, uiNotifier);
+    
+    // Set initial UI states
+    await updateActiveProjectIndicator();
 
     if (settings.firebaseConfig && settings.firebaseConfig.apiKey) {
         const initResult = await FirebaseSync.initFirebase(settings.firebaseConfig);
@@ -108,6 +112,17 @@ async function initializeApp() {
         configStatusEl.textContent = 'Firebase non configurato.';
         configStatusEl.className = 'text-center text-xs p-2 rounded-lg bg-yellow-500/20 text-yellow-300';
         launchOfflineMode();
+    }
+}
+
+async function updateActiveProjectIndicator() {
+    if (!currentProjectNameEl) return;
+    const projectId = await DataManager.getCurrentProjectId();
+    if (projectId) {
+        const project = await DataManager.getProject(projectId);
+        currentProjectNameEl.textContent = project ? project.title : 'Nessuno';
+    } else {
+        currentProjectNameEl.textContent = 'Nessuno';
     }
 }
 
@@ -183,6 +198,9 @@ function setupEventListeners() {
             DataManager.syncOnClose();
         }
     });
+
+    // Listen for settings changes to update UI elements
+    window.addEventListener('settingschanged', updateActiveProjectIndicator);
 }
 
 async function switchView(viewName) {

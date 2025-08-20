@@ -1,4 +1,5 @@
 let DataManager, FirebaseSync, loadModal, switchView;
+// Lazy import to avoid breaking existing flow; will import when rendering
 let newProjectModal = null;
 
 async function handleNewProjectClick() {
@@ -6,7 +7,19 @@ async function handleNewProjectClick() {
         newProjectModal = await loadModal('new-project');
     }
     if (newProjectModal) {
-        newProjectModal.open();
+        try {
+            const newProject = await newProjectModal.open();
+            // The 'datachanged' event will trigger the project list reload.
+            // We just need to set the current project and switch the view.
+            await DataManager.setCurrentProjectId(newProject.id);
+            switchView('ideation');
+        } catch (error) {
+            // This can be a real error or a modal cancellation.
+            // The new-project modal doesn't reject on duplicate, so we only log cancellations.
+            if (error.message === 'Modal cancelled') {
+                console.log('Creazione progetto annullata.');
+            }
+        }
     }
 }
 
@@ -36,6 +49,7 @@ async function loadProjects() {
         return;
     }
 
+    const overlayModule = await import('../shared/overlay.js');
     projects.forEach(project => {
         const card = document.createElement('div');
         card.className = 'bg-secondary p-6 rounded-xl border border-border-color hover:border-accent transition group relative';
@@ -49,15 +63,15 @@ async function loadProjects() {
         `;
         cardContent.addEventListener('click', () => selectProject(project.id));
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'absolute top-3 right-3 p-1 text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity';
-        deleteBtn.innerHTML = `<i data-lucide='trash-2' class='w-4 h-4'></i>`;
-        deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteProject(project.id, card);
+        overlayModule.addOverlayTo(card, {
+            positionClass: 'absolute top-3 right-3',
+            onEdit: async () => {
+                if (!newProjectModal) newProjectModal = await loadModal('new-project');
+                const updated = await newProjectModal.open(project);
+                if (updated) loadProjects();
+            },
+            onDelete: () => deleteProject(project.id, card)
         });
-
-        card.appendChild(deleteBtn);
         card.appendChild(cardContent);
         projectsListEl.appendChild(card);
     });
@@ -76,6 +90,15 @@ export default {
             newProjectBtn.addEventListener('click', handleNewProjectClick);
         }
 
+        // Initial load
         loadProjects();
+
+        // Listen for data changes
+        window.addEventListener('datachanged', (e) => {
+            if (e.detail && e.detail.storeName === 'projects') {
+                console.log('Project data changed, reloading project list.');
+                loadProjects();
+            }
+        });
     }
 };
