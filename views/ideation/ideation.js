@@ -29,7 +29,6 @@ function getRelationCategory(type) {
 }
 
 function setRelationFilter(sourceId, category) {
-    console.log('ideation.js: setRelationFilter called with', sourceId, category);
     if (activeRelationFilter && activeRelationFilter.sourceId === sourceId && activeRelationFilter.category === category) {
         activeRelationFilter = null; // Toggle off
     } else {
@@ -39,8 +38,50 @@ function setRelationFilter(sourceId, category) {
 }
 // --------------------------------------
 
+// --- Narrative Tag Filtering ---
+const NARRATIVE_TAGS = {
+    archetype: ['eroe', 'mentore', 'ombra', 'alleato', 'guardiano della soglia', 'messaggero', 'mutafaccia'],
+    role: ['protagonista', 'antagonista', 'deuteragonista', 'secondario'],
+    importance: ['principale', 'secondario', 'ricorrente', 'cameo']
+};
+let activeTagFilters = { archetype: null, role: null, importance: null };
+
+function populateTagFilters() {
+    for (const category in NARRATIVE_TAGS) {
+        const container = document.getElementById(`filter-${category}-tags`);
+        if (!container) continue;
+
+        container.innerHTML = ''; // Clear previous tags
+        
+        // Add a "clear filter" option
+        const clearTag = document.createElement('span');
+        clearTag.className = `tag-filter text-secondary text-xs font-medium me-2 px-2.5 py-0.5 rounded-full border border-transparent cursor-pointer hover:border-accent ${activeTagFilters[category] === null ? 'bg-accent text-primary' : ''}`;
+        clearTag.textContent = 'Tutti';
+        clearTag.addEventListener('click', () => toggleTagFilter(category, null));
+        container.appendChild(clearTag);
+
+        NARRATIVE_TAGS[category].forEach(tag => {
+            const tagEl = document.createElement('span');
+            tagEl.className = `tag-filter text-secondary text-xs font-medium me-2 px-2.5 py-0.5 rounded-full border border-transparent cursor-pointer hover:border-accent ${activeTagFilters[category] === tag ? 'bg-accent text-primary' : ''}`;
+            tagEl.textContent = tag.charAt(0).toUpperCase() + tag.slice(1);
+            tagEl.addEventListener('click', () => toggleTagFilter(category, tag));
+            container.appendChild(tagEl);
+        });
+    }
+}
+
+function toggleTagFilter(category, value) {
+    if (activeTagFilters[category] === value) {
+        activeTagFilters[category] = null; // Toggle off
+    } else {
+        activeTagFilters[category] = value;
+    }
+    populateTagFilters(); // Update UI of filter tags
+    loadCharacters(); // Re-render characters with new filter
+}
+// --------------------------------------
+
 async function switchIdeationTab(tabName) {
-    console.log('ideation.js: switchIdeationTab called with', tabName);
     document.querySelectorAll('.ideation-tab-btn').forEach(btn => {
         const isTarget = btn.dataset.tab === tabName;
         btn.classList.toggle('accent', isTarget);
@@ -53,11 +94,13 @@ async function switchIdeationTab(tabName) {
         content.classList.toggle('hidden', !isTarget);
     });
 
-    activeRelationFilter = null; // Reset filter when switching tabs
+    activeRelationFilter = null; // Reset relation filter when switching tabs
+    activeTagFilters = { archetype: null, role: null, importance: null }; // Reset tag filters
 
     if (tabName === 'ideas-ai') {
         loadIdeas();
     } else if (tabName === 'characters') {
+        populateTagFilters(); // Populate filters when switching to characters tab
         loadCharacters();
     } else if (tabName === 'worldbuilding') {
         loadLocations();
@@ -67,11 +110,42 @@ async function switchIdeationTab(tabName) {
 }
 
 async function loadIdeas() {
-    // ... (implementation is unchanged)
+    const ideasListEl = document.getElementById('ideas-list');
+    if (!ideasListEl) return;
+
+    const ideas = await DataManager.getProjectItems(currentProjectId, 'ideas');
+    ideasListEl.innerHTML = '';
+
+    if (ideas.length === 0) {
+        ideasListEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessuna idea salvata.</p>`;
+        return;
+    }
+
+    const overlayModule = await import('../shared/overlay.js');
+    ideas.forEach(idea => {
+        const ideaEl = document.createElement('div');
+        ideaEl.className = 'bg-primary p-3 rounded-lg text-sm text-secondary relative group';
+        ideaEl.innerHTML = `<div class="idea-content whitespace-pre-wrap">${idea.content}</div>`;
+
+        overlayModule.addOverlayTo(ideaEl, {
+            onEdit: async () => {
+                if (!newIdeaModal) newIdeaModal = await loadModal('new-idea');
+                newIdeaModal.open(idea);
+            },
+            onDelete: async () => {
+                if (confirm('Eliminare questa idea?')) {
+                    await DataManager.deleteProjectItem('ideas', idea.id);
+                    loadIdeas();
+                }
+            }
+        });
+
+        ideasListEl.appendChild(ideaEl);
+    });
+    lucide.createIcons();
 }
 
 async function loadCharacters() {
-    console.log('ideation.js: loadCharacters called');
     const charactersListEl = document.getElementById('characters-list');
     if (!charactersListEl) return;
 
@@ -82,6 +156,24 @@ async function loadCharacters() {
     if (allCharacters.length === 0) {
         charactersListEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center col-span-full">Nessun personaggio creato.</p>`;
         return;
+    }
+
+    let filteredCharacters = allCharacters;
+
+    // Apply Narrative Tag Filters
+    for (const category in activeTagFilters) {
+        const filterValue = activeTagFilters[category];
+        if (filterValue) {
+            filteredCharacters = filteredCharacters.filter(char => {
+                // Determine which property to filter on based on category
+                const charProperty = char[category]; // This is 'archetype', 'role', or 'importance'
+                
+                // Correctly access the narrative role property if category is 'role'
+                const valueToCompare = (category === 'role') ? char.narrativeRole : charProperty;
+                
+                return valueToCompare && valueToCompare.toLowerCase() === filterValue.toLowerCase();
+            });
+        }
     }
 
     let highlightedIds = null;
@@ -96,7 +188,7 @@ async function loadCharacters() {
     }
 
     const overlayModule = await import('../shared/overlay.js');
-    allCharacters.forEach(character => {
+    filteredCharacters.forEach(character => {
         const card = document.createElement('div');
         const isFaded = highlightedIds && !highlightedIds.includes(character.id);
         card.className = `bg-secondary p-4 rounded-xl border border-border-color hover:border-accent transition-all duration-300 group relative cursor-pointer ${isFaded ? 'opacity-30' : ''}`;
@@ -120,7 +212,7 @@ async function loadCharacters() {
         card.innerHTML = `
             <div class="card-content">
                 <h4 class="text-lg font-bold font-display text-primary mb-2">${character.name}</h4>
-                <p class="text-secondary text-sm mb-3 h-5 overflow-hidden">${character.role || 'Ruolo non definito'}</p>
+                <p class="text-secondary text-sm mb-3 h-5 overflow-hidden"><span>${character.role || 'Ruolo non definito'}</span></p>
                 <div class="h-6 mb-3">${tagsHTML}</div>
                 <div class="relations-container">${relationsHTML}</div>
             </div>
@@ -163,46 +255,33 @@ async function loadObjects() { /* ... unchanged ... */ }
 async function loadSystems() { /* ... unchanged ... */ }
 async function handleNewIdeaClick() { /* ... unchanged ... */ }
 async function handleNewCharacterClick() {
-    console.log('ideation.js: handleNewCharacterClick called');
     if (!characterModal) {
-        console.log('ideation.js: characterModal is null, loading it...');
         characterModal = await loadModal('character');
-        console.log('ideation.js: characterModal loaded:', characterModal);
     }
     if (characterModal) {
-        console.log('ideation.js: Opening characterModal...');
         characterModal.open();
-        console.log('ideation.js: characterModal.open() called.');
-    } else {
-        console.error('ideation.js: characterModal is still null after loading attempt.');
     }
 }
 
 export default {
     init: async function(dataManager, firebaseSync, modalLoader, viewSwitcher) {
-        console.log('ideation.js: init() called');
         DataManager = dataManager;
         FirebaseSync = firebaseSync;
         loadModal = modalLoader;
         switchView = viewSwitcher;
 
         currentProjectId = await DataManager.getCurrentProjectId();
-        console.log('ideation.js: currentProjectId in init():', currentProjectId);
         if (!currentProjectId) {
             document.getElementById('view-ideation').innerHTML = '<p class="text-secondary text-center col-span-full">Seleziona un progetto dalla dashboard per iniziare.</p>';
-            console.log('ideation.js: No current project, displaying message.');
             return;
         }
 
         // Load modals
-        console.log('ideation.js: Loading character modal...');
         characterModal = await loadModal('character');
-        console.log('ideation.js: Character modal loaded:', characterModal);
         locationModal = await loadModal('location');
         objectModal = await loadModal('object');
         systemModal = await loadModal('system');
         newIdeaModal = await loadModal('new-idea');
-        console.log('ideation.js: All modals loaded.');
 
         // Tab switching logic
         document.querySelectorAll('.ideation-tab-btn').forEach(button => {
@@ -228,6 +307,5 @@ export default {
 
         // Initial state: activate first tab and load its data
         switchIdeationTab('ideas-ai');
-        console.log('ideation.js: init() finished.');
     }
 };

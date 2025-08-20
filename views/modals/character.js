@@ -20,7 +20,6 @@ let relationsEditor, addRelationBtn;
 let allCharacters = []; // To populate relationship target dropdown
 
 function init() {
-    console.log('character.js: init() called');
     modal = document.getElementById('character-modal');
     form = document.getElementById('character-form');
     modalTitle = document.getElementById('character-modal-title');
@@ -54,11 +53,9 @@ function init() {
         e.preventDefault();
         save();
     });
-    console.log('character.js: init() finished');
 }
 
 function populateSelects() {
-    console.log('character.js: populateSelects() called');
     NARRATIVE_TAGS.archetype.forEach(tag => {
         archetypeSelect.add(new Option(tag.charAt(0).toUpperCase() + tag.slice(1), tag));
     });
@@ -68,21 +65,14 @@ function populateSelects() {
     NARRATIVE_TAGS.importance.forEach(tag => {
         importanceSelect.add(new Option(tag.charAt(0).toUpperCase() + tag.slice(1), tag));
     });
-    console.log('character.js: populateSelects() finished');
 }
 
 async function open(character = {}) {
-    console.log('character.js: open() called with character:', character);
     form.reset();
     
     // Fetch all characters for relationship dropdowns
     const currentProjectId = await DataManager.getCurrentProjectId();
-    console.log('character.js: currentProjectId in open():', currentProjectId);
     if (!currentProjectId) {
-        console.error('character.js: No current project ID found when opening character modal.');
-        // This might be the issue. If no project is selected, we can't add characters.
-        // The UI should prevent opening this modal if no project is selected.
-        // For now, let's just return.
         modal.classList.add('hidden'); // Ensure modal is hidden if no project
         alert("Nessun progetto selezionato. Seleziona un progetto dalla dashboard per aggiungere personaggi.");
         return;
@@ -90,7 +80,6 @@ async function open(character = {}) {
 
     try {
         allCharacters = await DataManager.getProjectItems(currentProjectId, 'characters');
-        console.log('character.js: allCharacters fetched:', allCharacters);
     } catch (error) {
         console.error('character.js: Error fetching allCharacters:', error);
         allCharacters = []; // Ensure it's an empty array on error
@@ -107,21 +96,17 @@ async function open(character = {}) {
     narrativeRoleSelect.value = character.narrativeRole || '';
     importanceSelect.value = character.importance || '';
 
-    console.log('character.js: Calling renderRelations()');
     renderRelations(character.relationships || []);
 
     modalTitle.textContent = character.id ? 'Modifica Personaggio' : 'Crea Nuovo Personaggio';
     modal.classList.remove('hidden');
-    console.log('character.js: open() finished');
 }
 
 function close() {
-    console.log('character.js: close() called');
     modal.classList.add('hidden');
 }
 
 async function save() {
-    console.log('character.js: save() called');
     const relationships = [];
     document.querySelectorAll('#character-relations-editor .relation-row').forEach(row => {
         const targetId = row.querySelector('.relation-target').value;
@@ -130,7 +115,6 @@ async function save() {
             relationships.push({ targetCharacterId: targetId, type: type });
         }
     });
-    console.log('character.js: relationships collected:', relationships);
 
     const characterData = {
         id: characterIdInput.value || undefined,
@@ -145,42 +129,34 @@ async function save() {
         importance: importanceSelect.value,
         relationships: relationships
     };
-    console.log('character.js: characterData to save:', characterData);
 
     if (!characterData.name) {
         alert('Il nome del personaggio è obbligatorio.');
-        console.log('character.js: Name is empty, returning.');
         return;
     }
 
     const currentProjectId = await DataManager.getCurrentProjectId();
-    console.log('character.js: currentProjectId in save():', currentProjectId);
     if (!currentProjectId) {
         alert("Nessun progetto selezionato.");
-        console.log('character.js: No project selected, returning.');
         return;
     }
 
     try {
         await DataManager.saveProjectItem(currentProjectId, 'characters', characterData);
-        console.log('character.js: Character saved successfully.');
         document.dispatchEvent(new CustomEvent('character-saved'));
         close();
     } catch (error) {
-        console.error('character.js: Error saving character:', error);
+        console.error('Error saving character:', error);
         alert(`Errore durante il salvataggio del personaggio: ${error.message}`);
     }
 }
 
 function renderRelations(relations = []) {
-    console.log('character.js: renderRelations() called with relations:', relations);
     relationsEditor.innerHTML = '';
     relations.forEach(rel => addRelationRow(rel));
-    console.log('character.js: renderRelations() finished');
 }
 
 function addRelationRow(relation = {}) {
-    console.log('character.js: addRelationRow() called with relation:', relation);
     const row = document.createElement('div');
     row.className = 'relation-row flex items-center gap-2 mb-2';
 
@@ -190,9 +166,6 @@ function addRelationRow(relation = {}) {
     targetSelect.add(new Option('Seleziona personaggio...', ''));
     
     const currentCharacterId = characterIdInput.value;
-    console.log('character.js: addRelationRow - currentCharacterId:', currentCharacterId);
-    console.log('character.js: addRelationRow - allCharacters:', allCharacters);
-
     allCharacters.forEach(char => {
         if (char.id !== currentCharacterId) { // Prevent self-relation
             targetSelect.add(new Option(char.name, char.id));
@@ -221,7 +194,6 @@ function addRelationRow(relation = {}) {
     relationsEditor.appendChild(row);
     
     lucide.createIcons();
-    console.log('character.js: addRelationRow() finished');
 }
 
 export default { init, open, close };
