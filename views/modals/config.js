@@ -2,6 +2,7 @@ import { DataManager } from '../../DataManager.js';
 
 let modal, form, saveBtn, cancelBtn, geminiApiKeyInput, firebaseConfigTextarea, jsonError;
 let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
+let genericModelContainer, googleModelContainer, configGoogleModelSelect;
 
 function init() {
     modal = document.getElementById('config-modal');
@@ -15,9 +16,24 @@ function init() {
     aiModelInput = document.getElementById('config-ai-model');
     aiApiKeyInput = document.getElementById('config-ai-apikey');
     aiProviderSelect = document.getElementById('config-ai-provider');
+    genericModelContainer = document.getElementById('generic-model-container');
+    googleModelContainer = document.getElementById('google-model-container');
+    configGoogleModelSelect = document.getElementById('config-google-model');
 
     cancelBtn.addEventListener('click', close);
     saveBtn.addEventListener('click', save);
+    aiProviderSelect.addEventListener('change', updateAIProviderUI);
+}
+
+function updateAIProviderUI() {
+    const provider = aiProviderSelect.value;
+    if (provider === 'google') {
+        genericModelContainer.classList.add('hidden');
+        googleModelContainer.classList.remove('hidden');
+    } else {
+        genericModelContainer.classList.remove('hidden');
+        googleModelContainer.classList.add('hidden');
+    }
 }
 
 async function open() {
@@ -29,8 +45,10 @@ async function open() {
     if (aiProviderSelect) aiProviderSelect.value = settings.aiProvider || 'openai-compatible';
     if (aiBaseUrlInput) aiBaseUrlInput.value = settings.aiBaseUrl || '';
     if (aiModelInput) aiModelInput.value = settings.aiModel || '';
+    if (configGoogleModelSelect) configGoogleModelSelect.value = settings.aiModel || 'gemini-1.5-flash';
     if (aiApiKeyInput) aiApiKeyInput.value = settings.aiApiKey || '';
     jsonError.textContent = '';
+    updateAIProviderUI(); // Set initial UI state
     modal.classList.remove('hidden');
 }
 
@@ -54,12 +72,17 @@ async function save() {
         }
     }
 
+    const provider = aiProviderSelect?.value || 'openai-compatible';
+    const model = provider === 'google' 
+        ? configGoogleModelSelect.value 
+        : aiModelInput?.value.trim() || '';
+
     await DataManager.saveSettings({ 
         geminiApiKey: geminiKey,
         firebaseConfig: firebaseConfig, // Sarà undefined se la stringa è vuota, che è ok
-    aiProvider: aiProviderSelect?.value || 'openai-compatible',
-    aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
-        aiModel: aiModelInput?.value.trim() || '',
+        aiProvider: provider,
+        aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
+        aiModel: model,
         aiApiKey: aiApiKeyInput?.value.trim() || ''
     });
 

@@ -10,6 +10,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Orbitron:wght@400;700&family=MedievalSharp&family=Special+Elite&family=Dancing+Script&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Import Map for browser-native ES Modules -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
+
     <script src="idb.js"></script>
 
     <link rel="stylesheet" href="style.css">
@@ -71,6 +81,10 @@
                     <button id="sidebar-settings-btn" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2">
                         <i data-lucide="settings" class="mr-3 text-secondary"></i>
                         <span class="text-primary">Impostazioni</span>
+                    </button>
+                    <button id="open-import-text" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2">
+                        <i data-lucide="download" class="mr-3 text-secondary"></i>
+                        <span class="text-primary">Importa Testo</span>
                     </button>
                     <button id="open-ai-assistant" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-4">
                         <i data-lucide="bot" class="mr-3 text-secondary"></i>

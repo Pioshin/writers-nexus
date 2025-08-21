@@ -6,10 +6,15 @@ let fillContextBtn;
 
 function show(opts = {}) {
   modalEl.classList.remove('hidden');
+  try { window.lucide?.createIcons?.(); } catch {}
+  // Autofocus sul prompt per scrivere subito
+  setTimeout(() => promptInput?.focus(), 0);
 }
 function hide() {
   modalEl.classList.add('hidden');
 }
+
+function open() { show(); }
 
 async function onSend() {
   const prompt = promptInput.value.trim();
@@ -38,7 +43,8 @@ function appendOutput(text, role = 'ai') {
   div.className = role === 'user' ? 'mb-2 text-secondary' : role === 'error' ? 'mb-2 text-red-400' : 'mb-4';
   div.innerText = text;
   outputEl.appendChild(div);
-  outputEl.scrollTop = outputEl.scrollHeight;
+  // Scroll to bottom after layout paints
+  requestAnimationFrame(() => { outputEl.scrollTop = outputEl.scrollHeight; });
 }
 
 function setLoading(isLoading) {
@@ -119,9 +125,9 @@ function init(dataManager, loadModal, switchView) {
 
   return {
     init: () => {},
-    open: () => show(),
+  open: () => show(),
     hide
   };
 }
 
-export default { init, show, hide };
+export default { init, show, hide, open };

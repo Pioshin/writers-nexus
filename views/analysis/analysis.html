@@ -1,5 +1,51 @@
 <div id="view-analysis" class="view-content">
-    <div class="border-b border-accent/20 mb-6 pb-4">
+    <div class="border-b border-accent/20 mb-6 pb-4 flex items-center justify-between">
         <h2 class="text-4xl font-display">Analisi</h2>
+        <button id="refresh-analysis" class="flex items-center text-sm px-3 py-1 bg-secondary text-primary rounded-lg border border-accent/30 hover:bg-primary"><i data-lucide="refresh-cw" class="mr-1 h-4 w-4"></i>Aggiorna</button>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section class="xl:col-span-1 bg-secondary border border-accent/20 rounded-xl p-4">
+            <h3 class="text-2xl font-display mb-2">Linee Narrative</h3>
+            <div id="plotlines-list" class="space-y-2"></div>
+        </section>
+        <section class="xl:col-span-2 bg-secondary border border-accent/20 rounded-xl p-4">
+            <h3 class="text-2xl font-display mb-2">Bilanciamento Personaggi</h3>
+            <div id="character-balance" class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-secondary border-b border-accent/20">
+                            <th class="text-left py-2 pr-2">Personaggio</th>
+                            <th class="text-left py-2 pr-2">Scene</th>
+                            <th class="text-left py-2 pr-2">Ruolo</th>
+                            <th class="text-left py-2 pr-2">Archetipo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="character-balance-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+        <section class="xl:col-span-2 bg-secondary border border-accent/20 rounded-xl p-4">
+            <h3 class="text-2xl font-display mb-2">Metriche Scene</h3>
+            <div id="scene-metrics" class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-secondary border-b border-accent/20">
+                            <th class="text-left py-2 pr-2">Scena</th>
+                            <th class="text-left py-2 pr-2">Lungh. (parole)</th>
+                            <th class="text-left py-2 pr-2">Stim. ritmo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scene-metrics-body"></tbody>
+                </table>
+            </div>
+        </section>
+        <section class="xl:col-span-1 bg-secondary border border-accent/20 rounded-xl p-4">
+            <h3 class="text-2xl font-display mb-2">Profilo Stile</h3>
+            <div id="style-profile" class="text-sm text-secondary"></div>
+        </section>
     </div>
 </div>

@@ -519,6 +519,28 @@ async function loadSystems() {
     lucide.createIcons();
 }
 
+// --- Worldbuilding extra (stub in attesa di store/modali dedicati) ---
+async function loadGeography() {
+    const listEl = document.getElementById('geography-list');
+    if (!listEl) return;
+    // Placeholder finché non esistono store e modali dedicati
+    listEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessun elemento. (Sezione in arrivo)</p>`;
+}
+
+async function loadHistory() {
+    const listEl = document.getElementById('history-list');
+    if (!listEl) return;
+    // Placeholder finché non esistono store e modali dedicati
+    listEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessun elemento. (Sezione in arrivo)</p>`;
+}
+
+async function loadCulture() {
+    const listEl = document.getElementById('culture-list');
+    if (!listEl) return;
+    // Placeholder finché non esistono store e modali dedicati
+    listEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessun elemento. (Sezione in arrivo)</p>`;
+}
+
 async function handleNewIdeaClick() {
     if (!newIdeaModal) {
         newIdeaModal = await loadModal('new-idea');
@@ -621,7 +643,9 @@ export default {
         // Entry-point Assistente IA nella testata Ideazione
         try {
             const aiModal = await loadModal('ai-assistant');
+            const importModal = await loadModal('import-text');
             const aiBtn = document.getElementById('open-ai-ideation');
+            const importBtn = document.getElementById('open-import-ideation');
             aiBtn?.addEventListener('click', async () => {
                 const project = currentProjectId ? await DataManager.getProject(currentProjectId) : null;
                 const goalEl = document.getElementById('ai-goal');
@@ -630,6 +654,7 @@ export default {
                 }
                 aiModal?.open?.();
             });
+            importBtn?.addEventListener('click', () => importModal?.open?.());
         } catch (e) { console.warn('AI modal non disponibile:', e); }
 
         // Precarica i sample audio al primo gesto dell'utente

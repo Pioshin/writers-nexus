@@ -7,10 +7,12 @@ import { AIService } from './ai/AIService.js';
 let isOfflineMode = false;
 let syncModal = null;
 let configModal = null;
+let importTextModal = null;
 
 // --- DOM ELEMENT VARIABLES ---
 let authScreen, appScreen, mainNav, mainContentArea, themeSelector, showConfigBtn, sidebarSettingsBtn, loginForm, logoutBtn, userEmailEl, loginSubmitBtn, authErrorEl, userInfoEl, configStatusEl, modalContainer, currentProjectNameEl;
     let openAiBtn;
+    let openImportBtn;
 let aiAssistantModal;
 
 // --- UI NOTIFIER ---
@@ -78,6 +80,7 @@ async function initializeApp() {
     showConfigBtn = document.getElementById('show-config-btn');
     sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
     openAiBtn = document.getElementById('open-ai-assistant');
+    openImportBtn = document.getElementById('open-import-text');
     loginForm = document.getElementById('login-form');
     logoutBtn = document.getElementById('logout-btn');
     userEmailEl = document.getElementById('user-email');
@@ -95,6 +98,7 @@ async function initializeApp() {
     configModal = await loadModal('config');
     syncModal = await loadModal('sync');
     aiAssistantModal = await loadModal('ai-assistant');
+    importTextModal = await loadModal('import-text');
 
     setupEventListeners();
     DataManager.init(FirebaseSync, uiNotifier);
@@ -195,6 +199,7 @@ function setupEventListeners() {
     });
     sidebarSettingsBtn.addEventListener('click', () => configModal?.open());
     openAiBtn?.addEventListener('click', () => aiAssistantModal?.open?.());
+    openImportBtn?.addEventListener('click', () => importTextModal?.open?.());
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();

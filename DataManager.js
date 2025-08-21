@@ -1,6 +1,6 @@
 const DB_NAME = 'WriterNexusDB';
-const DB_VERSION = 2;
-const STORE_NAMES = ['projects', 'ideas', 'characters', 'locations', 'objects', 'systems', 'settings', 'scenes'];
+const DB_VERSION = 4;
+const STORE_NAMES = ['projects', 'ideas', 'characters', 'locations', 'objects', 'systems', 'settings', 'scenes', 'geography', 'history', 'culture', 'plotlines'];
 
 let dbPromise = null;
 let firebaseSync = null;
@@ -15,6 +15,7 @@ function getDb() {
         dbPromise = idb.openDB(DB_NAME, DB_VERSION, {
             upgrade(db, oldVersion) {
                 console.log(`Upgrading DB from ${oldVersion} to ${DB_VERSION}`);
+                // Create stores if missing (handles all upgrade paths)
                 STORE_NAMES.forEach(storeName => {
                     if (!db.objectStoreNames.contains(storeName)) {
                         const store = db.createObjectStore(storeName, { keyPath: 'id' });
