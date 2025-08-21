@@ -618,6 +618,20 @@ export default {
         // Initial state: activate first tab and load its data
         switchIdeationTab('ideas-ai');
 
+        // Entry-point Assistente IA nella testata Ideazione
+        try {
+            const aiModal = await loadModal('ai-assistant');
+            const aiBtn = document.getElementById('open-ai-ideation');
+            aiBtn?.addEventListener('click', async () => {
+                const project = currentProjectId ? await DataManager.getProject(currentProjectId) : null;
+                const goalEl = document.getElementById('ai-goal');
+                if (goalEl) {
+                    goalEl.value = `Genera 10 logline originali e con hook, ispirate alla premessa${project?.premise ? `: ${project.premise}` : ''}`;
+                }
+                aiModal?.open?.();
+            });
+        } catch (e) { console.warn('AI modal non disponibile:', e); }
+
         // Precarica i sample audio al primo gesto dell'utente
         let preloadedSword = false;
         const preloadAudioOnGesture = async () => {

@@ -71,6 +71,19 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
         updateWordCount();
     });
 
+    // IA entry-point: continuazione scena
+    try {
+        const aiModal = await modalLoader('ai-assistant');
+        const aiBtn = document.getElementById('open-ai-writing');
+        aiBtn?.addEventListener('click', async () => {
+            const goalEl = document.getElementById('ai-goal');
+            if (goalEl && currentScene) {
+                goalEl.value = `Continua la scena "${currentScene.title || 'Senza titolo'}" nello stesso tono. Sinossi: ${currentScene.synopsis || 'N/A'}`;
+            }
+            aiModal?.open?.();
+        });
+    } catch {}
+
         // Manuscript overlay events
         document.getElementById('open-manuscript-btn').addEventListener('click', openManuscript);
         manuscriptCloseBtn.addEventListener('click', closeManuscript);

@@ -2,6 +2,7 @@ import { AIService } from '../../ai/AIService.js';
 
 let modalEl, sendBtn, closeBtn, stopBtn, promptInput, outputEl, goalEl, presetEl, contextEl;
 let currentMode = 'ideation';
+let fillContextBtn;
 
 function show(opts = {}) {
   modalEl.classList.remove('hidden');
@@ -81,6 +82,7 @@ function init(dataManager, loadModal, switchView) {
   goalEl = document.getElementById('ai-goal');
   presetEl = document.getElementById('ai-preset');
   contextEl = document.getElementById('ai-context');
+  fillContextBtn = document.getElementById('ai-fill-context');
 
   document.querySelectorAll('.ai-mode').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -93,6 +95,27 @@ function init(dataManager, loadModal, switchView) {
   sendBtn.addEventListener('click', onSend);
   closeBtn.addEventListener('click', hide);
   stopBtn.addEventListener('click', () => AIService.abort());
+  fillContextBtn?.addEventListener('click', async () => {
+    const projectId = await dataManager.getCurrentProjectId();
+    if (!projectId) return;
+    const project = await dataManager.getProject(projectId);
+    const scenes = await dataManager.getProjectItems(projectId, 'scenes');
+    const currentSceneId = await dataManager.getCurrentSceneId();
+    const currentScene = currentSceneId ? await dataManager.getScene(currentSceneId) : null;
+    const characters = await dataManager.getProjectItems(projectId, 'characters');
+    const locations = await dataManager.getProjectItems(projectId, 'locations');
+    const ideas = await dataManager.getProjectItems(projectId, 'ideas');
+    const ctx = [
+      project?.title ? `Titolo: ${project.title}` : null,
+      project?.premise ? `Premessa: ${project.premise}` : null,
+      currentScene ? `Scena corrente: ${currentScene.title} — ${currentScene.synopsis || ''}` : null,
+      scenes?.length ? `Scene totali: ${scenes.length}` : null,
+      characters?.length ? `Personaggi: ${characters.slice(0,5).map(c=>c.name).join(', ')}${characters.length>5?'…':''}` : null,
+      locations?.length ? `Luoghi: ${locations.slice(0,5).map(l=>l.name).join(', ')}${locations.length>5?'…':''}` : null,
+      ideas?.length ? `Idee esistenti: ${ideas.length}` : null
+    ].filter(Boolean).join('\n');
+    contextEl.value = ctx;
+  });
 
   return {
     init: () => {},

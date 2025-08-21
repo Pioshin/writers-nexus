@@ -1,7 +1,7 @@
 import { DataManager } from '../../DataManager.js';
 
 let modal, form, saveBtn, cancelBtn, geminiApiKeyInput, firebaseConfigTextarea, jsonError;
-let aiBaseUrlInput, aiModelInput, aiApiKeyInput;
+let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
 
 function init() {
     modal = document.getElementById('config-modal');
@@ -14,6 +14,7 @@ function init() {
     aiBaseUrlInput = document.getElementById('config-ai-baseurl');
     aiModelInput = document.getElementById('config-ai-model');
     aiApiKeyInput = document.getElementById('config-ai-apikey');
+    aiProviderSelect = document.getElementById('config-ai-provider');
 
     cancelBtn.addEventListener('click', close);
     saveBtn.addEventListener('click', save);
@@ -25,6 +26,7 @@ async function open() {
     if (settings.firebaseConfig) {
         firebaseConfigTextarea.value = JSON.stringify(settings.firebaseConfig, null, 2);
     }
+    if (aiProviderSelect) aiProviderSelect.value = settings.aiProvider || 'openai-compatible';
     if (aiBaseUrlInput) aiBaseUrlInput.value = settings.aiBaseUrl || '';
     if (aiModelInput) aiModelInput.value = settings.aiModel || '';
     if (aiApiKeyInput) aiApiKeyInput.value = settings.aiApiKey || '';
@@ -55,7 +57,8 @@ async function save() {
     await DataManager.saveSettings({ 
         geminiApiKey: geminiKey,
         firebaseConfig: firebaseConfig, // Sarà undefined se la stringa è vuota, che è ok
-        aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
+    aiProvider: aiProviderSelect?.value || 'openai-compatible',
+    aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
         aiModel: aiModelInput?.value.trim() || '',
         aiApiKey: aiApiKeyInput?.value.trim() || ''
     });
