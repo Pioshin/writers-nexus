@@ -1,4 +1,4 @@
-<div id="view-writing" class="view-content p-8 flex flex-col h-full">
+<div id="view-writing" class="view-content p-6 h-full flex flex-col">
     <div class="border-b border-accent/20 mb-4 pb-4">
         <div class="flex justify-between items-center">
             <div>
@@ -6,16 +6,61 @@
                     <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>
                     Torna alla Struttura
                 </button>
-                <h2 id="writing-scene-title" class="text-4xl font-display">Scrittura Scena</h2>
+                <h2 id="writing-scene-title" class="text-3xl md:text-4xl font-display">Scrittura Scena</h2>
             </div>
-            <div id="writing-stats" class="text-right">
-                <p class="text-secondary">Conteggio parole</p>
-                <p id="word-count" class="text-2xl font-bold">0</p>
+            <div class="flex items-end gap-6">
+                <div class="text-right">
+                    <p class="text-secondary">Conteggio parole</p>
+                    <p id="word-count" class="text-2xl font-bold">0</p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="prev-scene-btn" class="px-3 py-2 text-sm bg-primary rounded-lg border border-accent/30 hover:bg-opacity-80"><i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Precedente</button>
+                    <button id="next-scene-btn" class="px-3 py-2 text-sm bg-primary rounded-lg border border-accent/30 hover:bg-opacity-80">Successiva<i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i></button>
+                <button id="open-manuscript-btn" class="px-3 py-2 text-sm bg-accent text-primary rounded-lg hover:bg-accent-hover"><i data-lucide="book-open" class="w-4 h-4 mr-1"></i>Manoscritto</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div id="writing-editor-container" class="flex-grow flex flex-col">
-        <textarea id="writing-editor" class="w-full h-full bg-primary p-4 rounded-lg border border-border-color focus:outline-none focus:ring-2 focus:ring-accent resize-none text-lg leading-relaxed"></textarea>
+    <div class="flex-1 flex min-h-0 gap-4">
+        <!-- Navigator Scene (ordine Struttura) -->
+        <aside class="w-72 hidden lg:block bg-secondary/40 border border-accent/10 rounded-lg p-3 overflow-y-auto">
+            <h3 class="text-sm font-semibold text-secondary mb-2">Scene (ordine Struttura)</h3>
+            <ul id="scenes-nav" class="space-y-1 text-sm"></ul>
+        </aside>
+
+        <!-- Editor a blocchi -->
+        <section class="flex-1 flex flex-col min-w-0">
+            <div id="scene-meta" class="text-secondary text-sm mb-3"></div>
+            <div id="blocks-container" class="flex-1 overflow-y-auto space-y-3 p-2 bg-secondary/30 border border-accent/10 rounded-lg"></div>
+            <div class="flex justify-between items-center mt-3">
+                <button id="add-block-btn" class="flex items-center px-3 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover transition"><i data-lucide="plus" class="w-4 h-4 mr-2"></i>Aggiungi Paragrafo</button>
+                <div class="text-xs text-secondary">Salvataggio automatico dopo una breve pausa di digitazione</div>
+            </div>
+        </section>
     </div>
+  
+        <!-- Overlay Manoscritto full-screen senza distrazioni -->
+            <div id="manuscript-overlay" class="hidden fixed inset-0 z-50 bg-primary">
+                <div class="max-w-5xl mx-auto h-full flex flex-col p-4">
+                    <header class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pb-3 border-b border-accent/20">
+                        <div class="flex items-center gap-2 text-secondary">
+                            <i data-lucide="book-open" class="w-5 h-5"></i>
+                            <span class="text-sm">Vista Manoscritto</span>
+                        </div>
+                        <nav id="manuscript-anchors" class="flex flex-wrap gap-2 text-xs"></nav>
+                        <div class="flex items-center gap-2">
+                            <div class="hidden sm:flex items-center gap-4 mr-3 text-secondary text-xs">
+                                <div>Parole: <span id="manuscript-words" class="text-primary font-bold">0</span></div>
+                                <div>Pagine: <span id="manuscript-pages" class="text-primary font-bold">0.00</span></div>
+                            </div>
+                            <button id="toggle-focus-mode" class="px-3 py-1 text-xs bg-primary rounded-lg border border-accent/30 hover:bg-opacity-80">Focus paragrafo</button>
+                            <button id="toggle-manuscript-edit" class="px-3 py-1 text-xs bg-primary rounded-lg border border-accent/30 hover:bg-opacity-80">Solo lettura</button>
+                            <button id="close-manuscript-btn" class="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"><i data-lucide="x" class="w-4 h-4 mr-1"></i>Chiudi</button>
+                        </div>
+                    </header>
+                    <main id="manuscript-content" class="flex-1 overflow-y-auto py-6"></main>
+                <footer class="pt-3 border-t border-accent/20 text-center text-xs text-secondary">ESC per chiudere • Salvataggio automatico attivo</footer>
+            </div>
+        </div>
 </div>

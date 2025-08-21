@@ -1,7 +1,15 @@
 <div id="view-structure" class="view-content p-8">
     <div class="border-b border-accent/20 mb-6 pb-4">
-        <h2 class="text-4xl font-display">Struttura della Trama</h2>
-        <p class="text-lg text-secondary">Organizza la tua storia seguendo le tappe del Viaggio dell'Eroe.</p>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <h2 class="text-4xl font-display">Struttura della Trama</h2>
+                <p class="text-lg text-secondary">Organizza la tua storia seguendo le tappe del Viaggio dell'Eroe.</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="global-expand-all" class="px-3 py-1 text-sm bg-primary rounded border border-accent/30 hover:bg-opacity-80">Espandi tutte</button>
+                <button id="global-collapse-all" class="px-3 py-1 text-sm bg-primary rounded border border-accent/30 hover:bg-opacity-80">Contrai tutte</button>
+            </div>
+        </div>
     </div>
 
     <div id="structure-container" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -9,18 +17,30 @@
         <!-- Atto 1 -->
         <div id="act-1" class="bg-secondary/50 p-4 rounded-lg border border-border-color">
             <h3 class="text-2xl font-display accent text-center mb-4">Atto I: Partenza</h3>
+            <div class="flex justify-center gap-3 mb-4">
+                <button id="act-1-expand-all" class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80">Espandi tutto</button>
+                <button id="act-1-collapse-all" class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80">Contrai tutto</button>
+            </div>
             <div id="act-1-stages" class="space-y-4"></div>
         </div>
 
         <!-- Atto 2 -->
         <div id="act-2" class="bg-secondary/50 p-4 rounded-lg border border-border-color">
             <h3 class="text-2xl font-display accent text-center mb-4">Atto II: Iniziazione</h3>
+            <div class="flex justify-center gap-3 mb-4">
+                <button id="act-2-expand-all" class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80">Espandi tutto</button>
+                <button id="act-2-collapse-all" class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80">Contrai tutto</button>
+            </div>
             <div id="act-2-stages" class="space-y-4"></div>
         </div>
 
         <!-- Atto 3 -->
         <div id="act-3" class="bg-secondary/50 p-4 rounded-lg border border-border-color">
             <h3 class="text-2xl font-display accent text-center mb-4">Atto III: Ritorno</h3>
+            <div class="flex justify-center gap-3 mb-4">
+                <button id="act-3-expand-all" class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80">Espandi tutto</button>
+                <button id="act-3-collapse-all" class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80">Contrai tutto</button>
+            </div>
             <div id="act-3-stages" class="space-y-4"></div>
         </div>
 

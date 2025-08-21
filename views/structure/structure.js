@@ -39,6 +39,25 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
     }
 
     renderStructure();
+
+    // Hook Expand/Collapse All per ogni atto
+    const bindBulkToggle = (actId) => {
+        const expandBtn = document.getElementById(`${actId}-expand-all`);
+        const collapseBtn = document.getElementById(`${actId}-collapse-all`);
+        expandBtn?.addEventListener('click', () => toggleAllStages(actId, true));
+        collapseBtn?.addEventListener('click', () => toggleAllStages(actId, false));
+    };
+    bindBulkToggle('act-1');
+    bindBulkToggle('act-2');
+    bindBulkToggle('act-3');
+
+    // Hook globale
+    document.getElementById('global-expand-all')?.addEventListener('click', () => {
+        ['act-1','act-2','act-3'].forEach(id => toggleAllStages(id, true));
+    });
+    document.getElementById('global-collapse-all')?.addEventListener('click', () => {
+        ['act-1','act-2','act-3'].forEach(id => toggleAllStages(id, false));
+    });
 }
 
 function renderStructure() {
@@ -68,10 +87,7 @@ function createStageElement(stage) {
     const addBtn = stageEl.querySelector('.add-scene-btn');
 
     toggleBtn.addEventListener('click', () => {
-        scenesList.classList.toggle('hidden');
-        const icon = toggleBtn.querySelector('i');
-        icon.setAttribute('data-lucide', scenesList.classList.contains('hidden') ? 'chevrons-up-down' : 'chevrons-down-up');
-        lucide.createIcons();
+        toggleStageList(scenesList, toggleBtn);
     });
 
     addBtn.addEventListener('click', () => {
@@ -81,6 +97,39 @@ function createStageElement(stage) {
     loadScenesForStage(stage.key, scenesList);
 
     return stageEl;
+}
+
+function toggleStageList(scenesList, toggleBtn) {
+    scenesList.classList.toggle('hidden');
+    const icon = toggleBtn.querySelector('i');
+    icon.setAttribute('data-lucide', scenesList.classList.contains('hidden') ? 'chevrons-up-down' : 'chevrons-down-up');
+    lucide.createIcons();
+}
+
+function toggleAllStages(actId, expand) {
+    const container = document.getElementById(`${actId}-stages`);
+    if (!container) return;
+    const stages = container.querySelectorAll('.stage-container');
+    stages.forEach(stage => {
+        const scenesList = stage.querySelector('.scenes-list');
+        const toggleBtn = stage.querySelector('.toggle-scenes-btn');
+        if (!scenesList || !toggleBtn) return;
+        setStageListState(scenesList, toggleBtn, expand);
+    });
+    // Aggiorna le icone una sola volta dopo l'operazione bulk
+    lucide.createIcons();
+}
+
+function setStageListState(scenesList, toggleBtn, expand) {
+    if (expand) {
+        scenesList.classList.remove('hidden');
+    } else {
+        scenesList.classList.add('hidden');
+    }
+    const icon = toggleBtn?.querySelector('i');
+    if (icon) {
+        icon.setAttribute('data-lucide', scenesList.classList.contains('hidden') ? 'chevrons-up-down' : 'chevrons-down-up');
+    }
 }
 
 async function loadScenesForStage(stageKey, scenesListContainer) {

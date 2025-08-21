@@ -1,6 +1,11 @@
 let DataManager, FirebaseSync, loadModal, switchView;
 // Lazy import to avoid breaking existing flow; will import when rendering
 let newProjectModal = null;
+let deleteConfirmModalEl = null;
+let deleteConfirmNameEl = null;
+let deleteConfirmCancelBtn = null;
+let deleteConfirmOkBtn = null;
+let pendingDelete = null; // { projectId, cardElement }
 
 async function handleNewProjectClick() {
     if (!newProjectModal) {
@@ -29,12 +34,34 @@ async function selectProject(projectId) {
     switchView('ideation');
 }
 
-async function deleteProject(projectId, cardElement) {
-    if (confirm('Sei sicuro di voler eliminare questo progetto e tutti i suoi dati? L\'azione è irreversibile.')) {
-        await DataManager.deleteProject(projectId);
-        cardElement.remove();
-        // Potremmo anche controllare se la lista progetti è vuota e mostrare il messaggio
+function openDeleteConfirm(project, cardElement) {
+    if (!deleteConfirmModalEl) return;
+    pendingDelete = { projectId: project.id, cardElement };
+    deleteConfirmNameEl.textContent = project.title || 'Questo progetto';
+    deleteConfirmModalEl.classList.remove('hidden');
+    // Aggiorna icone lucide nel caso non fossero già state inizializzate
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
     }
+}
+
+async function confirmDelete() {
+    if (!pendingDelete) return;
+    const { projectId, cardElement } = pendingDelete;
+    try {
+        await DataManager.deleteProject(projectId);
+        cardElement?.remove();
+        // Ricarica elenco per sicurezza (stato coerente)
+        loadProjects();
+    } finally {
+        closeDeleteConfirm();
+    }
+}
+
+function closeDeleteConfirm() {
+    if (!deleteConfirmModalEl) return;
+    deleteConfirmModalEl.classList.add('hidden');
+    pendingDelete = null;
 }
 
 async function loadProjects() {
@@ -70,7 +97,7 @@ async function loadProjects() {
                 const updated = await newProjectModal.open(project);
                 if (updated) loadProjects();
             },
-            onDelete: () => deleteProject(project.id, card)
+            onDelete: () => openDeleteConfirm(project, card)
         });
         card.appendChild(cardContent);
         projectsListEl.appendChild(card);
@@ -88,6 +115,20 @@ export default {
         const newProjectBtn = document.getElementById('new-project-btn');
         if (newProjectBtn) {
             newProjectBtn.addEventListener('click', handleNewProjectClick);
+        }
+
+        // Hook modal conferma
+        deleteConfirmModalEl = document.getElementById('delete-project-confirm-modal');
+        if (deleteConfirmModalEl) {
+            deleteConfirmNameEl = document.getElementById('delete-project-name');
+            deleteConfirmCancelBtn = document.getElementById('cancel-delete-project-modal');
+            deleteConfirmOkBtn = document.getElementById('confirm-delete-project');
+            deleteConfirmCancelBtn?.addEventListener('click', closeDeleteConfirm);
+            deleteConfirmOkBtn?.addEventListener('click', confirmDelete);
+            // Chiudi cliccando backdrop
+            deleteConfirmModalEl.addEventListener('click', (e) => {
+                if (e.target === deleteConfirmModalEl) closeDeleteConfirm();
+            });
         }
 
         // Initial load
