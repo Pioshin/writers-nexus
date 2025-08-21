@@ -119,7 +119,9 @@ export const DataManager = {
         const db = await getDb();
         let settings = await db.get('settings', 'user_settings');
         if (!settings) {
-            settings = { id: 'user_settings', theme: 'scifi', currentProjectId: null, currentSceneId: null, lastModified: Date.now() };
+            settings = { id: 'user_settings', theme: 'scifi', currentProjectId: null, currentSceneId: null, lastModified: Date.now(),
+                // IA defaults
+                aiProvider: 'openai-compatible', aiBaseUrl: '', aiModel: '', aiHeaders: {}, aiApiKey: '' };
         }
         return settings;
     },

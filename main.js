@@ -1,6 +1,7 @@
 import { DataManager } from './DataManager.js';
 import { FirebaseSync } from './FirebaseSync.js';
 import { ThemeManager } from './ThemeManager.js';
+import { AIService } from './ai/AIService.js';
 
 // --- STATE ---
 let isOfflineMode = false;
@@ -9,6 +10,8 @@ let configModal = null;
 
 // --- DOM ELEMENT VARIABLES ---
 let authScreen, appScreen, mainNav, mainContentArea, themeSelector, showConfigBtn, sidebarSettingsBtn, loginForm, logoutBtn, userEmailEl, loginSubmitBtn, authErrorEl, userInfoEl, configStatusEl, modalContainer, currentProjectNameEl;
+    let openAiBtn;
+let aiAssistantModal;
 
 // --- UI NOTIFIER ---
 const uiNotifier = {
@@ -74,6 +77,7 @@ async function initializeApp() {
     themeSelector = document.getElementById('theme-selector');
     showConfigBtn = document.getElementById('show-config-btn');
     sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
+    openAiBtn = document.getElementById('open-ai-assistant');
     loginForm = document.getElementById('login-form');
     logoutBtn = document.getElementById('logout-btn');
     userEmailEl = document.getElementById('user-email');
@@ -90,12 +94,22 @@ async function initializeApp() {
     // Pre-load modals
     configModal = await loadModal('config');
     syncModal = await loadModal('sync');
+    aiAssistantModal = await loadModal('ai-assistant');
 
     setupEventListeners();
     DataManager.init(FirebaseSync, uiNotifier);
     
     // Set initial UI states
     await updateActiveProjectIndicator();
+
+    // Init AI with settings
+    AIService.init({
+        provider: settings.aiProvider || 'openai-compatible',
+        baseUrl: settings.aiBaseUrl || '',
+        apiKey: settings.aiApiKey || '',
+        model: settings.aiModel || '',
+        headers: settings.aiHeaders || {}
+    });
 
     if (settings.firebaseConfig && settings.firebaseConfig.apiKey) {
         const initResult = await FirebaseSync.initFirebase(settings.firebaseConfig);
@@ -172,7 +186,15 @@ function setupEventListeners() {
     });
 
     showConfigBtn.addEventListener('click', () => configModal?.open());
+    // Shortcut per aprire l'assistente IA
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            aiAssistantModal?.open?.();
+        }
+    });
     sidebarSettingsBtn.addEventListener('click', () => configModal?.open());
+    openAiBtn?.addEventListener('click', () => aiAssistantModal?.open?.());
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
