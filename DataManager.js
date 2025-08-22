@@ -195,3 +195,21 @@ Object.assign(DataManager, {
     async saveProjectItem(projectId, itemType, itemData) {const db = await getDb();const id = itemData.id || generateId(itemType.slice(0, 4));const now = Date.now();const item = { ...itemData, id, projectId, lastModified: now };if (!item.createdAt) item.createdAt = now;await db.put(itemType, item);return item;},
     async deleteProjectItem(itemType, itemId) { const db = await getDb(); await db.delete(itemType, itemId); }
 });
+
+// Helpers per import sostitutivo: pulizia dati per progetto
+Object.assign(DataManager, {
+    async clearProjectStore(projectId, storeName) {
+        const db = await getDb();
+        const tx = db.transaction(storeName, 'readwrite');
+        const index = tx.store.index('by_projectId');
+        for await (const cursor of index.iterate(projectId)) {
+            await cursor.delete();
+        }
+        await tx.done;
+    },
+    async clearProjectStores(projectId, storeNames) {
+        for (const s of storeNames) {
+            await this.clearProjectStore(projectId, s);
+        }
+    }
+});

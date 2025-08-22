@@ -1,3 +1,4 @@
+import { AIService } from '../../ai/AIService.js';
 let DataManager, FirebaseSync, loadModal, switchView;
 let currentProjectId;
 let newIdeaModal = null;
@@ -134,10 +135,15 @@ async function loadIdeas() {
     }
 
     const overlayModule = await import('../shared/overlay.js');
-    ideas.forEach(idea => {
+    ideas.forEach((idea, index) => {
         const ideaEl = document.createElement('div');
-        ideaEl.className = 'bg-primary p-3 rounded-lg text-sm text-secondary relative group';
-        ideaEl.innerHTML = `<div class="idea-content whitespace-pre-wrap">${idea.content}</div>`;
+        ideaEl.className = 'bg-primary p-3 rounded-lg border border-accent/30 text-sm text-secondary relative group';
+        ideaEl.innerHTML = `
+            <div class="flex items-start gap-3">
+                <span class="bg-accent text-primary text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">${index + 1}</span>
+                <div class="idea-content whitespace-pre-wrap flex-1">${idea.content}</div>
+            </div>
+        `;
 
         overlayModule.addOverlayTo(ideaEl, {
             onEdit: async () => {
@@ -155,6 +161,54 @@ async function loadIdeas() {
         ideasListEl.appendChild(ideaEl);
     });
     lucide.createIcons();
+}
+
+async function generateIdeasShortcut() {
+    const submitBtn = document.getElementById('gemini-submit');
+    const responseEl = document.getElementById('gemini-response');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Generazione...';
+    responseEl.innerHTML = '<div class="flex items-center justify-center p-4"><i data-lucide="loader" class="animate-spin"></i><span class="ml-2">L\'IA sta pensando...</span></div>';
+    lucide.createIcons();
+
+    try {
+        const project = await DataManager.getProject(currentProjectId);
+        const premise = project?.premise;
+
+        if (!premise) {
+            responseEl.textContent = 'Errore: La premessa del progetto non è stata trovata. Aggiungila nella Dashboard.';
+            return;
+        }
+
+        const prompt = `Basandoti sulla seguente premessa, genera 3 idee distinte e concise per una storia. Ogni idea dovrebbe essere un singolo paragrafo. Formatta l'output in questo modo: numera ogni idea e separala con '---'. Esempio: 1. [Idea 1] --- 2. [Idea 2] --- 3. [Idea 3]\n\nPremessa: "${premise}"`;
+
+        const aiResponse = await AIService.complete({ prompt });
+        const ideasText = aiResponse.text;
+
+        const ideas = ideasText.split('---').map(idea => idea.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+
+        if (ideas.length === 0) {
+            responseEl.textContent = 'L\'IA non ha generato idee valide. Prova a riformulare la premessa.';
+            return;
+        }
+
+        // Mostra solo le idee generate senza salvarle automaticamente
+        responseEl.innerHTML = ideas.map((idea, index) => `<div class="p-2 my-1 bg-primary rounded"><b>${index + 1}.</b> ${idea}</div>`).join('');
+
+        // Mostra il bottone per salvare la risposta come idea
+        const saveBtn = document.getElementById('save-gemini-response-btn');
+        if (saveBtn) {
+            saveBtn.classList.remove('hidden');
+        }
+
+    } catch (error) {
+        console.error('Error generating ideas:', error);
+        responseEl.textContent = `Si è verificato un errore: ${error.message}`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Interroga l'IA";
+    }
 }
 
 async function loadCharacters() {
@@ -618,6 +672,7 @@ export default {
         });
 
         // Button event listeners
+        document.getElementById('gemini-submit').addEventListener('click', generateIdeasShortcut);
         document.getElementById('new-character-btn').addEventListener('click', handleNewCharacterClick);
         document.getElementById('new-idea-btn').addEventListener('click', handleNewIdeaClick);
         document.getElementById('new-location-btn').addEventListener('click', () => locationModal.open());
