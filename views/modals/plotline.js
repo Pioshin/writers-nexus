@@ -3,6 +3,26 @@ import { toast } from '../shared/toast.js';
 
 let modal, listEl, form, idEl, nameEl, typeEl, colorEl, statusEl, loglineEl, descriptionEl, beatsEl;
 let saveBtn, cancelBtn, newBtn, addBeatBtn, deleteBtn;
+let lastFocused = null; let trapCleanup = null;
+
+function trapFocus(container) {
+  const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const nodes = Array.from(container.querySelectorAll(FOCUSABLE)).filter(el => !el.disabled && el.offsetParent !== null);
+  if (!nodes.length) return () => {};
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  function handle(e) {
+    if (e.key === 'Tab') {
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    } else if (e.key === 'Escape') {
+      hide();
+    }
+  }
+  container.addEventListener('keydown', handle);
+  first.focus();
+  return () => container.removeEventListener('keydown', handle);
+}
 let currentProjectId;
 
 function beatRowTemplate(beat) {
@@ -37,8 +57,11 @@ function beatRowTemplate(beat) {
         <input type="text" class="beat-summary w-full mt-1 px-2 py-1 bg-secondary border border-accent/20 rounded" value="${summary}">
       </div>
       <div>
-        <label class="text-xs text-secondary">Scene (ids, csv)</label>
-        <input type="text" class="beat-scenes w-full mt-1 px-2 py-1 bg-secondary border border-accent/20 rounded" value="${sceneIds}" placeholder="scene-...,scene-...">
+        <label class="text-xs text-secondary">Scene</label>
+        <div class="mt-1">
+          <select multiple class="beat-scenes-multi w-full px-2 py-1 bg-secondary border border-accent/20 rounded text-xs" size="4" data-initial="${sceneIds}"></select>
+          <div class="text-[10px] text-secondary mt-1">CTRL/SHIFT per selezioni multiple</div>
+        </div>
       </div>
     </div>
     <div class="flex justify-end mt-2">
@@ -100,12 +123,14 @@ function fillForm(pl) {
     wrapper.innerHTML = beatRowTemplate(b);
     beatsEl.appendChild(wrapper.firstChild);
   });
+  hydrateBeatSelects();
 }
 
 function addBeat() {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = beatRowTemplate({});
   beatsEl.appendChild(wrapper.firstChild);
+  hydrateBeatSelects();
 }
 
 function collectBeats() {
@@ -115,7 +140,7 @@ function collectBeats() {
     title: r.querySelector('.beat-title').value.trim(),
     stage: r.querySelector('.beat-stage').value,
     summary: r.querySelector('.beat-summary').value.trim(),
-    sceneIds: r.querySelector('.beat-scenes').value.split(',').map(s => s.trim()).filter(Boolean)
+    sceneIds: Array.from(r.querySelectorAll('.beat-scenes-multi option:checked')).map(o => o.value)
   }));
 }
 
@@ -187,11 +212,33 @@ function init() {
 }
 
 function open() {
+  lastFocused = document.activeElement;
   modal.classList.remove('hidden');
+  trapCleanup = trapFocus(modal);
+  hydrateBeatSelects();
 }
 
 function hide() {
   modal.classList.add('hidden');
+  if (trapCleanup) { trapCleanup(); trapCleanup = null; }
+  if (lastFocused && typeof lastFocused.focus === 'function') { try { lastFocused.focus(); } catch {} }
+  lastFocused = null;
 }
 
 export default { init, open, hide };
+
+// Popola select multiple con le scene correnti del progetto
+async function hydrateBeatSelects() {
+  if (!currentProjectId) return;
+  const scenes = await DataManager.getProjectItems(currentProjectId, 'scenes');
+  const optionsHtml = (scenes||[]).sort((a,b)=> (a.order??0)-(b.order??0)).map(s=>`<option value="${s.id}">${(s.order??'')+'. '+(s.title||'Scena')}</option>`).join('');
+  beatsEl.querySelectorAll('.beat-scenes-multi').forEach(sel => {
+    const initial = sel.getAttribute('data-initial');
+    const selected = initial ? initial.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    sel.innerHTML = optionsHtml;
+    selected.forEach(id => {
+      const opt = sel.querySelector(`option[value="${id}"]`);
+      if (opt) opt.selected = true;
+    });
+  });
+}

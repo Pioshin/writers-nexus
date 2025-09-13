@@ -45,7 +45,10 @@ async function renderAnalysis() {
     // Character balance: conteggio occorrenze (menzioni) + scene con menzione, alias e ranking per ruolo
     const cbody = document.getElementById('character-balance-body');
     cbody.innerHTML = '';
-    const sceneTexts = scenes.map(s => `${s.title || ''}\n${s.content || ''}`);
+    const sceneTextsRaw = scenes.map(s => `${s.title || ''}\n${s.content || ''}`);
+    // Normalizzazione diacritici per matching più robusto
+    function normalize(str){ return (str||'').normalize('NFD').replace(/\p{Diacritic}+/gu,''); }
+    const sceneTexts = sceneTextsRaw.map(normalize);
 
     const ROLE_WEIGHT = {
         protagonista: 10,
@@ -56,17 +59,25 @@ async function renderAnalysis() {
 
     const STOP_TOKENS = new Set(['di','de','del','della','dello','delle','dei','da','dal','dai','dalla','dalle','van','von','la','il','lo','le','gli','i','l']);
 
-    function buildPatterns(name) {
-        const n = (name || '').trim();
+    function buildPatterns(name, aliases=[]) {
+        const base = (name || '').trim();
+        const aliasList = Array.isArray(aliases) ? aliases : [];
+        const variants = [base, ...aliasList].map(v=>normalize(v)).filter(Boolean);
+        const n = base;
         if (!n) return [];
         const esc = s => s.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
-        const tokens = n.split(/\s+/).filter(t => t.length >= 3 && !STOP_TOKENS.has(t.toLowerCase()));
-        const parts = [n, ...tokens];
-        return Array.from(new Set(parts.map(p => new RegExp(`(?:^|[^A-Za-zÀ-ÖØ-öø-ÿ])${esc(p)}(?:[^A-Za-zÀ-ÖØ-öø-ÿ]|$)`, 'gi'))));
+        const tokenize = v => v.split(/\s+/).filter(t => t.length >= 3 && !STOP_TOKENS.has(t.toLowerCase()));
+        const parts = new Set();
+        for (const v of variants) {
+            const toks = tokenize(v);
+            parts.add(normalize(v));
+            toks.forEach(t=>parts.add(normalize(t)));
+        }
+        return Array.from(parts).map(p => new RegExp(`(?:^|[^A-Za-z])${esc(p)}(?:[^A-Za-z]|$)`, 'gi'));
     }
 
     const rows = characters.map(c => {
-        const pats = buildPatterns(c.name);
+        const pats = buildPatterns(c.name, c.aliases || c.aka || []);
         let mentions = 0;
         let scenesWithMention = 0;
         for (const txt of sceneTexts) {
