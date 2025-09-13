@@ -1,0 +1,120 @@
+<div id="import-text-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+  <div class="w-[min(100%,980px)] max-h-[90vh] overflow-hidden bg-secondary border border-accent/30 rounded-2xl shadow-xl flex flex-col">
+    <header class="p-4 border-b border-accent/20 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+  <i data-lucide="download" class="accent"></i>
+        <h3 class="font-display text-xl">Importa Testo e Analizza</h3>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="import-run-btn" class="px-3 py-1 text-xs bg-accent text-primary rounded hover:bg-accent-hover">Analizza</button>
+        <button id="import-close-btn" class="px-3 py-1 text-xs bg-primary border border-accent/30 rounded hover:bg-opacity-80">Chiudi</button>
+      </div>
+    </header>
+    <div class="grid grid-cols-1 md:grid-cols-[340px,1fr] min-h-[60vh]">
+      <aside class="p-4 border-r border-accent/20 space-y-3 bg-primary/40 overflow-auto">
+        <div>
+          <h4 class="text-sm text-secondary mb-1">Sorgente</h4>
+          <div class="space-y-2 text-xs">
+            <input type="file" id="import-file" accept=".txt,.md,.rtf,.docx" class="w-full">
+            <textarea id="import-text" rows="8" placeholder="Incolla qui il testo..." class="w-full px-2 py-1 bg-primary border border-accent/30 rounded"></textarea>
+            <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="import-split-scenes" checked>Segmenta automaticamente in scene</label>
+            <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="import-extract-entities" checked>Estrai personaggi/luoghi/oggetti ecc.</label>
+            <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="import-analyze-style" checked>Analizza stile autore</label>
+          </div>
+        </div>
+        <div>
+          <h4 class="text-sm text-secondary mb-1">Opzioni</h4>
+          <div class="grid grid-cols-1 gap-2 text-xs">
+            <select id="import-split-strategy" class="w-full px-2 py-1 bg-primary border border-accent/30 rounded">
+              <option value="auto">Auto (heading/scene cues)</option>
+              <option value="paragraphs">Per paragrafi lunghi</option>
+              <option value="chapters">Per capitoli</option>
+            </select>
+            <input id="import-min-scene-length" type="number" value="300" class="w-full px-2 py-1 bg-primary border border-accent/30 rounded" placeholder="Min. caratteri per scena">
+            <input id="import-analysis-focus" type="text" class="w-full px-2 py-1 bg-primary border border-accent/30 rounded" placeholder="Focus analisi (es: trova antagonisti secondari, linee romantiche)">
+          </div>
+          <div class="mt-3 text-xs">
+            <h4 class="text-sm text-secondary mb-1">Modalità Import</h4>
+            <label class="flex items-center gap-2"><input type="radio" name="import-mode" value="merge" id="import-mode-merge" checked> Unisci (incrementale, deduplica per nome/titolo)</label>
+            <label class="flex items-center gap-2 mt-1"><input type="radio" name="import-mode" value="replace" id="import-mode-replace"> Sostituisci (cancella e reimporta selezionati)</label>
+          </div>
+        </div>
+      </aside>
+      <section class="flex flex-col min-w-0">
+        <div id="import-log" class="h-36 overflow-auto p-4 text-xs whitespace-pre-wrap"></div>
+        <div id="import-preview" class="border-t border-accent/20 p-4 text-sm hidden max-h-[48vh] overflow-auto">
+          <h4 class="font-display text-lg mb-3">Anteprima importazione</h4>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Scene (<span id="preview-scenes-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-scenes" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-scenes" class="space-y-1 max-h-48 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Idee (<span id="preview-ideas-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-ideas" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-ideas" class="space-y-1 max-h-48 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Personaggi (<span id="preview-characters-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-characters" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-characters" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Linee narrative (<span id="preview-plotlines-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-plotlines" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-plotlines" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Luoghi (<span id="preview-locations-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-locations" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-locations" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Oggetti (<span id="preview-objects-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-objects" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-objects" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Geografia (<span id="preview-geography-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-geography" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-geography" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Storia (<span id="preview-history-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-history" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-history" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+            <div>
+              <div class="mb-2 text-secondary flex items-center justify-between">
+                <span>Cultura (<span id="preview-culture-count">0</span>)</span>
+                <label class="text-xs flex items-center gap-1"><input type="checkbox" id="select-all-culture" checked> Seleziona tutto</label>
+              </div>
+              <ul id="preview-culture" class="space-y-1 max-h-40 overflow-auto pr-2"></ul>
+            </div>
+          </div>
+        </div>
+        <div class="border-t border-accent/20 p-3 flex items-center gap-2">
+          <button id="import-commit-btn" class="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-50" disabled>Importa nel progetto</button>
+          <span id="import-status" class="text-secondary text-xs"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

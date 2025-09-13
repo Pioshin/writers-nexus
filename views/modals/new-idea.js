@@ -1,4 +1,5 @@
 import { DataManager } from '../../DataManager.js';
+import { toast } from '../shared/toast.js';
 
 let modal, form, cancelBtn, contentInput;
 let currentEditingIdeaId = null;
@@ -31,10 +32,7 @@ async function save(e) {
     if (!content) return;
 
     const currentProjectId = await DataManager.getCurrentProjectId();
-    if (!currentProjectId) {
-        alert("Nessun progetto selezionato.");
-        return;
-    }
+    if (!currentProjectId) { toast.error('Nessun progetto selezionato.'); return; }
 
     const payload = currentEditingIdeaId ? { id: currentEditingIdeaId, content } : { content };
     await DataManager.saveProjectItem(currentProjectId, 'ideas', payload);

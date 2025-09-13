@@ -4,6 +4,16 @@
         <form id="new-project-form">
             <input id="new-project-title" name="title" type="text" placeholder="Titolo del romanzo" required class="w-full mb-4 px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
             <textarea id="new-project-premise" name="premise" placeholder="Premessa: l'intero romanzo in una frase." rows="3" class="w-full mb-4 p-3 bg-primary rounded-lg border border-accent/30 focus:outline-none focus:ring-2 focus:ring-accent"></textarea>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="new-project-genre" class="block text-sm text-secondary mb-1">Genere</label>
+                    <input id="new-project-genre" name="genre" type="text" placeholder="Es. fantascienza, giallo, comico..." class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                </div>
+                <div>
+                    <label for="new-project-tone" class="block text-sm text-secondary mb-1">Tono</label>
+                    <input id="new-project-tone" name="tone" type="text" placeholder="Es. comico, grottesco, epico..." class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                </div>
+            </div>
             <div id="new-project-error" class="hidden text-red-500 text-sm mb-4"></div>
             <div class="flex justify-end gap-4">
                 <button type="button" id="cancel-project-modal" class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80">Annulla</button>

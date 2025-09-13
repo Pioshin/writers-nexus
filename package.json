@@ -6,5 +6,8 @@
   },
   "scripts": {
     "start": "live-server --port=55099"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
   }
 }

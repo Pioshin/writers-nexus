@@ -1,5 +1,5 @@
 let DataManager;
-let modal, form, cancelBtn, titleInput, premiseInput;
+let modal, form, cancelBtn, titleInput, premiseInput, genreInput, toneInput;
 let resolvePromise, rejectPromise;
 let currentEditingProjectId = null;
 
@@ -7,6 +7,8 @@ async function handleFormSubmit(e) {
     e.preventDefault();
     const title = titleInput.value.trim();
     const premise = premiseInput.value.trim();
+    const genre = genreInput.value.trim();
+    const tone = toneInput.value.trim();
 
     if (!title) return;
 
@@ -16,7 +18,7 @@ async function handleFormSubmit(e) {
     errorEl.classList.add('hidden');
 
     try {
-        const payload = currentEditingProjectId ? { id: currentEditingProjectId, title, premise } : { title, premise };
+    const payload = currentEditingProjectId ? { id: currentEditingProjectId, title, premise, genre, tone } : { title, premise, genre, tone };
         const newProject = await DataManager.saveProject(payload);
         close();
         if (resolvePromise) {
@@ -51,9 +53,13 @@ function open(project = null) {
         submitBtn.textContent = 'Salva';
         titleInput.value = project.title || '';
         premiseInput.value = project.premise || '';
+    genreInput.value = project.genre || '';
+    toneInput.value = project.tone || '';
     } else {
         titleEl.textContent = 'Crea un Nuovo Progetto';
         submitBtn.textContent = 'Crea';
+    genreInput.value = '';
+    toneInput.value = '';
     }
 
     modal.classList.remove('hidden');
@@ -84,6 +90,8 @@ function init(dataManager) {
     cancelBtn = document.getElementById('cancel-project-modal');
     titleInput = document.getElementById('new-project-title');
     premiseInput = document.getElementById('new-project-premise');
+    genreInput = document.getElementById('new-project-genre');
+    toneInput = document.getElementById('new-project-tone');
 }
 
 export default { init, open, close };

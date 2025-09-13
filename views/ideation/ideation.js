@@ -1,3 +1,4 @@
+import { AIService } from '../../ai/AIService.js';
 let DataManager, FirebaseSync, loadModal, switchView;
 let currentProjectId;
 let newIdeaModal = null;
@@ -134,10 +135,15 @@ async function loadIdeas() {
     }
 
     const overlayModule = await import('../shared/overlay.js');
-    ideas.forEach(idea => {
+    ideas.forEach((idea, index) => {
         const ideaEl = document.createElement('div');
-        ideaEl.className = 'bg-primary p-3 rounded-lg text-sm text-secondary relative group';
-        ideaEl.innerHTML = `<div class="idea-content whitespace-pre-wrap">${idea.content}</div>`;
+        ideaEl.className = 'bg-primary p-3 rounded-lg border border-accent/30 text-sm text-secondary relative group';
+        ideaEl.innerHTML = `
+            <div class="flex items-start gap-3">
+                <span class="bg-accent text-primary text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">${index + 1}</span>
+                <div class="idea-content whitespace-pre-wrap flex-1">${idea.content}</div>
+            </div>
+        `;
 
         overlayModule.addOverlayTo(ideaEl, {
             onEdit: async () => {
@@ -145,7 +151,7 @@ async function loadIdeas() {
                 newIdeaModal.open(idea);
             },
             onDelete: async () => {
-                if (confirm('Eliminare questa idea?')) {
+                if (await window.appConfirm('Eliminare questa idea?', { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('ideas', idea.id);
                     loadIdeas();
                 }
@@ -155,6 +161,54 @@ async function loadIdeas() {
         ideasListEl.appendChild(ideaEl);
     });
     lucide.createIcons();
+}
+
+async function generateIdeasShortcut() {
+    const submitBtn = document.getElementById('gemini-submit');
+    const responseEl = document.getElementById('gemini-response');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Generazione...';
+    responseEl.innerHTML = '<div class="flex items-center justify-center p-4"><i data-lucide="loader" class="animate-spin"></i><span class="ml-2">L\'IA sta pensando...</span></div>';
+    lucide.createIcons();
+
+    try {
+        const project = await DataManager.getProject(currentProjectId);
+        const premise = project?.premise;
+
+        if (!premise) {
+            responseEl.textContent = 'Errore: La premessa del progetto non è stata trovata. Aggiungila nella Dashboard.';
+            return;
+        }
+
+        const prompt = `Basandoti sulla seguente premessa, genera 3 idee distinte e concise per una storia. Ogni idea dovrebbe essere un singolo paragrafo. Formatta l'output in questo modo: numera ogni idea e separala con '---'. Esempio: 1. [Idea 1] --- 2. [Idea 2] --- 3. [Idea 3]\n\nPremessa: "${premise}"`;
+
+        const aiResponse = await AIService.complete({ prompt });
+        const ideasText = aiResponse.text;
+
+        const ideas = ideasText.split('---').map(idea => idea.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+
+        if (ideas.length === 0) {
+            responseEl.textContent = 'L\'IA non ha generato idee valide. Prova a riformulare la premessa.';
+            return;
+        }
+
+        // Mostra solo le idee generate senza salvarle automaticamente
+        responseEl.innerHTML = ideas.map((idea, index) => `<div class="p-2 my-1 bg-primary rounded"><b>${index + 1}.</b> ${idea}</div>`).join('');
+
+        // Mostra il bottone per salvare la risposta come idea
+        const saveBtn = document.getElementById('save-gemini-response-btn');
+        if (saveBtn) {
+            saveBtn.classList.remove('hidden');
+        }
+
+    } catch (error) {
+        console.error('Error generating ideas:', error);
+        responseEl.textContent = `Si è verificato un errore: ${error.message}`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Interroga l'IA";
+    }
 }
 
 async function loadCharacters() {
@@ -234,7 +288,7 @@ async function loadCharacters() {
             positionClass: 'overlay-actions', // Using the new shared class
             onEdit: () => characterModal.open(character),
             onDelete: async () => {
-                if (confirm(`Sei sicuro di voler eliminare ${character.name}?`)) {
+                if (await window.appConfirm(`Sei sicuro di voler eliminare ${character.name}?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('characters', character.id);
                     loadCharacters();
                 }
@@ -446,7 +500,7 @@ async function loadLocations() {
         overlayModule.addOverlayTo(el, {
             onEdit: () => locationModal.open(loc),
             onDelete: async () => {
-                if (confirm(`Eliminare il luogo \"${loc.name}\"?`)) {
+                if (await window.appConfirm(`Eliminare il luogo \"${loc.name}\"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('locations', loc.id);
                     loadLocations();
                 }
@@ -477,7 +531,7 @@ async function loadObjects() {
         overlayModule.addOverlayTo(el, {
             onEdit: () => objectModal.open(obj),
             onDelete: async () => {
-                if (confirm(`Eliminare l'oggetto \"${obj.name}\"?`)) {
+                if (await window.appConfirm(`Eliminare l'oggetto \"${obj.name}\"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('objects', obj.id);
                     loadObjects();
                 }
@@ -508,7 +562,7 @@ async function loadSystems() {
         overlayModule.addOverlayTo(el, {
             onEdit: () => systemModal.open(sys),
             onDelete: async () => {
-                if (confirm(`Eliminare il sistema \"${sys.name}\"?`)) {
+                if (await window.appConfirm(`Eliminare il sistema \"${sys.name}\"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('systems', sys.id);
                     loadSystems();
                 }
@@ -517,6 +571,28 @@ async function loadSystems() {
         listEl.appendChild(el);
     });
     lucide.createIcons();
+}
+
+// --- Worldbuilding extra (stub in attesa di store/modali dedicati) ---
+async function loadGeography() {
+    const listEl = document.getElementById('geography-list');
+    if (!listEl) return;
+    // Placeholder finché non esistono store e modali dedicati
+    listEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessun elemento. (Sezione in arrivo)</p>`;
+}
+
+async function loadHistory() {
+    const listEl = document.getElementById('history-list');
+    if (!listEl) return;
+    // Placeholder finché non esistono store e modali dedicati
+    listEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessun elemento. (Sezione in arrivo)</p>`;
+}
+
+async function loadCulture() {
+    const listEl = document.getElementById('culture-list');
+    if (!listEl) return;
+    // Placeholder finché non esistono store e modali dedicati
+    listEl.innerHTML = `<p class="text-secondary text-sm p-4 text-center">Nessun elemento. (Sezione in arrivo)</p>`;
 }
 
 async function handleNewIdeaClick() {
@@ -596,6 +672,7 @@ export default {
         });
 
         // Button event listeners
+        document.getElementById('gemini-submit').addEventListener('click', generateIdeasShortcut);
         document.getElementById('new-character-btn').addEventListener('click', handleNewCharacterClick);
         document.getElementById('new-idea-btn').addEventListener('click', handleNewIdeaClick);
         document.getElementById('new-location-btn').addEventListener('click', () => locationModal.open());
@@ -617,6 +694,23 @@ export default {
 
         // Initial state: activate first tab and load its data
         switchIdeationTab('ideas-ai');
+
+        // Entry-point Assistente IA nella testata Ideazione
+        try {
+            const aiModal = await loadModal('ai-assistant');
+            const importModal = await loadModal('import-text');
+            const aiBtn = document.getElementById('open-ai-ideation');
+            const importBtn = document.getElementById('open-import-ideation');
+            aiBtn?.addEventListener('click', async () => {
+                const project = currentProjectId ? await DataManager.getProject(currentProjectId) : null;
+                const goalEl = document.getElementById('ai-goal');
+                if (goalEl) {
+                    goalEl.value = `Genera 10 logline originali e con hook, ispirate alla premessa${project?.premise ? `: ${project.premise}` : ''}`;
+                }
+                aiModal?.open?.();
+            });
+            importBtn?.addEventListener('click', () => importModal?.open?.());
+        } catch (e) { console.warn('AI modal non disponibile:', e); }
 
         // Precarica i sample audio al primo gesto dell'utente
         let preloadedSword = false;

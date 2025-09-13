@@ -3,6 +3,40 @@
         <h3 class="text-2xl font-display mb-4">Configurazione Backend</h3>
         <p class="text-secondary mb-6 text-sm">Incolla qui l'oggetto di configurazione del tuo progetto Firebase e la chiave API di Google Gemini. I dati verranno salvati solo nel tuo browser.</p>
         <form id="config-form" class="flex-grow overflow-y-auto pr-4 space-y-3">
+            <section class="space-y-2">
+                <h4 class="text-sm text-secondary">Assistente IA</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-secondary mb-1">Provider</label>
+                        <select id="config-ai-provider" class="w-full px-3 py-2 bg-primary border border-accent/30 rounded">
+                            <option value="openai-compatible">OpenAI compatibile</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="ollama">Ollama (locale)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-secondary mb-1">Base URL (OpenAI-compatibile)</label>
+                        <input id="config-ai-baseurl" class="w-full px-3 py-2 bg-primary border border-accent/30 rounded" placeholder="https://api.openai.com/v1">
+                    </div>
+                    <div id="generic-model-container">
+                        <label class="block text-xs text-secondary mb-1">Modello</label>
+                        <input id="config-ai-model" class="w-full px-3 py-2 bg-primary border border-accent/30 rounded" placeholder="gpt-4o-mini">
+                    </div>
+                    <div id="google-model-container" class="hidden">
+                        <label class="block text-xs text-secondary mb-1">Modello (Gemini)</label>
+                        <select id="config-google-model" class="w-full px-3 py-2 bg-primary border border-accent/30 rounded">
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            <option value="gemini-pro">Gemini Pro</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs text-secondary mb-1">API Key</label>
+                        <input id="config-ai-apikey" type="password" class="w-full px-3 py-2 bg-primary border border-accent/30 rounded" placeholder="sk-...">
+                    </div>
+                </div>
+            </section>
             <div>
                 <label for="config-firebase-json" class="text-sm font-semibold text-secondary">Configurazione Firebase (JSON)</label>
                 <textarea id="config-firebase-json" rows="8" placeholder='{ "apiKey": "...", "authDomain": "...", ... }' required class="w-full p-3 bg-primary border border-accent/30 rounded-lg text-sm font-mono"></textarea>

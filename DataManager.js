@@ -1,6 +1,6 @@
 const DB_NAME = 'WriterNexusDB';
-const DB_VERSION = 2;
-const STORE_NAMES = ['projects', 'ideas', 'characters', 'locations', 'objects', 'systems', 'settings', 'scenes'];
+const DB_VERSION = 4;
+const STORE_NAMES = ['projects', 'ideas', 'characters', 'locations', 'objects', 'systems', 'settings', 'scenes', 'geography', 'history', 'culture', 'plotlines'];
 
 let dbPromise = null;
 let firebaseSync = null;
@@ -15,6 +15,7 @@ function getDb() {
         dbPromise = idb.openDB(DB_NAME, DB_VERSION, {
             upgrade(db, oldVersion) {
                 console.log(`Upgrading DB from ${oldVersion} to ${DB_VERSION}`);
+                // Create stores if missing (handles all upgrade paths)
                 STORE_NAMES.forEach(storeName => {
                     if (!db.objectStoreNames.contains(storeName)) {
                         const store = db.createObjectStore(storeName, { keyPath: 'id' });
@@ -119,7 +120,9 @@ export const DataManager = {
         const db = await getDb();
         let settings = await db.get('settings', 'user_settings');
         if (!settings) {
-            settings = { id: 'user_settings', theme: 'scifi', currentProjectId: null, currentSceneId: null, lastModified: Date.now() };
+            settings = { id: 'user_settings', theme: 'scifi', currentProjectId: null, currentSceneId: null, lastModified: Date.now(),
+                // IA defaults
+                aiProvider: 'openai-compatible', aiBaseUrl: '', aiModel: '', aiHeaders: {}, aiApiKey: '' };
         }
         return settings;
     },
@@ -191,4 +194,22 @@ Object.assign(DataManager, {
     async getProjectItems(projectId, itemType) { const db = await getDb(); return db.getAllFromIndex(itemType, 'by_projectId', projectId); },
     async saveProjectItem(projectId, itemType, itemData) {const db = await getDb();const id = itemData.id || generateId(itemType.slice(0, 4));const now = Date.now();const item = { ...itemData, id, projectId, lastModified: now };if (!item.createdAt) item.createdAt = now;await db.put(itemType, item);return item;},
     async deleteProjectItem(itemType, itemId) { const db = await getDb(); await db.delete(itemType, itemId); }
+});
+
+// Helpers per import sostitutivo: pulizia dati per progetto
+Object.assign(DataManager, {
+    async clearProjectStore(projectId, storeName) {
+        const db = await getDb();
+        const tx = db.transaction(storeName, 'readwrite');
+        const index = tx.store.index('by_projectId');
+        for await (const cursor of index.iterate(projectId)) {
+            await cursor.delete();
+        }
+        await tx.done;
+    },
+    async clearProjectStores(projectId, storeNames) {
+        for (const s of storeNames) {
+            await this.clearProjectStore(projectId, s);
+        }
+    }
 });

@@ -4,7 +4,7 @@ import { getFirestore, setDoc, doc, getDoc, collection, getDocs, writeBatch, Tim
 
 let auth, db;
 let currentUserId = null;
-const STORE_NAMES = ['projects', 'ideas', 'characters', 'locations', 'objects', 'systems', 'settings'];
+const STORE_NAMES = ['projects', 'ideas', 'characters', 'locations', 'objects', 'systems', 'settings', 'scenes', 'geography', 'history', 'culture', 'plotlines'];
 
 // Funzione helper per convertire i dati per Firestore (es. timestamp)
 function toFirestoreData(obj) {
