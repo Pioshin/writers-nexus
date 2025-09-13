@@ -1,4 +1,5 @@
 import { DataManager } from '../../DataManager.js';
+import { toast } from '../shared/toast.js';
 
 let modal, form, saveBtn, cancelBtn, geminiApiKeyInput, firebaseConfigTextarea, jsonError;
 let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
@@ -87,9 +88,8 @@ async function save() {
     });
 
     close();
-    // Mostra un messaggio di ricarica
-    alert('Configurazione salvata. La pagina verrà ricaricata per applicare le modifiche.');
-    location.reload();
+    toast.success('Configurazione salvata. Ricarico la pagina...');
+    setTimeout(() => location.reload(), 600);
 }
 
 export default { init, open, close };

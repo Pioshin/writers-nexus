@@ -1,5 +1,6 @@
 import { DataManager } from '../../DataManager.js';
 import { AIService } from '../../ai/AIService.js';
+import { toast } from '../shared/toast.js';
 
 const NARRATIVE_TAGS = {
     archetype: ['eroe', 'mentore', 'ombra', 'alleato', 'guardiano della soglia', 'messaggero', 'mutafaccia'],
@@ -116,8 +117,8 @@ async function open(character = {}) {
     // Fetch all characters for relationship dropdowns
     const currentProjectId = await DataManager.getCurrentProjectId();
     if (!currentProjectId) {
-        modal.classList.add('hidden'); // Ensure modal is hidden if no project
-        alert("Nessun progetto selezionato. Seleziona un progetto dalla dashboard per aggiungere personaggi.");
+    modal.classList.add('hidden');
+    toast.error('Nessun progetto selezionato. Seleziona un progetto dalla dashboard per aggiungere personaggi.');
         return;
     }
 
@@ -183,16 +184,10 @@ async function save() {
         relationships: relationships
     };
 
-    if (!characterData.name) {
-        alert('Il nome del personaggio è obbligatorio.');
-        return;
-    }
+    if (!characterData.name) { toast.error('Il nome del personaggio è obbligatorio.'); return; }
 
     const currentProjectId = await DataManager.getCurrentProjectId();
-    if (!currentProjectId) {
-        alert("Nessun progetto selezionato.");
-        return;
-    }
+    if (!currentProjectId) { toast.error('Nessun progetto selezionato.'); return; }
 
     try {
         await DataManager.saveProjectItem(currentProjectId, 'characters', characterData);
@@ -200,7 +195,7 @@ async function save() {
         close();
     } catch (error) {
         console.error('Error saving character:', error);
-        alert(`Errore durante il salvataggio del personaggio: ${error.message}`);
+    toast.error(`Errore durante il salvataggio del personaggio: ${error.message}`);
     }
 }
 
@@ -358,7 +353,7 @@ function applyAIToFields() {
     try {
         obj = JSON.parse(repaired);
     } catch (e) {
-        alert('JSON IA non valido, correggi e riprova.');
+    toast.error('JSON IA non valido, correggi e riprova.');
         return;
     }
     // Apply conservatively: only set if provided

@@ -158,7 +158,7 @@ function createSceneCard(scene) {
             positionClass: 'absolute top-2 right-2',
             onEdit: () => sceneEditorModal.open({ scene }),
             onDelete: async () => {
-                if (confirm(`Sei sicuro di voler eliminare la scena "${scene.title}"?`)) {
+                if (await window.appConfirm(`Sei sicuro di voler eliminare la scena "${scene.title}"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteScene(scene.id);
                     cardEl.remove();
                 }

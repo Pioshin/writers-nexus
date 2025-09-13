@@ -110,8 +110,9 @@ function parseRomanzoStructuredMD(raw) {
 
   const flushScene = () => {
     if (!currentScene) return;
-    currentScene.content = currentScene.buffer.join('\n').trim();
-    currentScene.synopsis = currentScene.synopsis || currentScene.content.slice(0, 240);
+    // Mantieni contenuto integrale; la sinossi è solo un estratto ma non sostituisce il content
+    currentScene.content = currentScene.buffer.join('\n');
+    currentScene.synopsis = currentScene.synopsis || currentScene.content.trim().slice(0, 240);
     const k = currentScene.stageKey || 'imported';
     stageOrderCounters[k] = (stageOrderCounters[k] || 0) + 1;
     currentScene.order = stageOrderCounters[k];
@@ -334,7 +335,7 @@ async function commitToProject(dataManager, projectId, result, options = { mode:
       projectId,
       title: s.title,
       synopsis: s.synopsis || '',
-      content: s.content,
+      content: s.content, // contenuto integrale
       stageKey: s.stageKey || 'imported',
       order: s.order || (i + 1)
     });
@@ -587,6 +588,79 @@ function init(dataManager) {
   closeBtn.addEventListener('click', hide);
 
   return { open: show, hide };
+}
+
+export async function importRawText(dataManager, projectId, rawText, { mode = 'merge', split = true, strategy = 'auto', minSceneLength = 300, extract = true, analyzeStyle = true, focus = '' } = {}) {
+  // local copies of inner helpers
+  const run = async () => {
+    // mimic runAnalysis options
+    const raw = rawText;
+    const structured = parseRomanzoStructuredMD(raw);
+    let scenes = structured?.scenes?.length ? structured.scenes : [{ title: 'Manoscritto', synopsis: '', content: raw }];
+    let ideasFromDoc = structured?.ideas || [];
+    if (!structured?.scenes?.length && split) {
+      const chunks = naiveSplitIntoScenes(raw, strategy, minSceneLength);
+      scenes = chunks.map((c, i) => ({ title: `Scena ${i+1}`, synopsis: '', content: c }));
+    }
+    let entities = { characters: [], locations: [], objects: [], geography: [], history: [], culture: [] };
+    let relations = [];
+    let plotlines = [];
+    let style = null;
+    if (extract || analyzeStyle) {
+      // reuse the same IA chunking logic (inline minimal copy)
+      const header = `Analizza il seguente testo e restituisci JSON con campi: characters(name, role, archetype?), locations(name, description?), objects(name, description?), geography(name, description?), history(name, description?), culture(name, description?), relations(source, target, type), plotlines(list of names with brief description), style(voice, pacing, lexical richness, tone), ideas(optional list: title, content).`;
+      const chunks = [];
+      const max = 5500;
+      for (let i = 0; i < raw.length; i += max) chunks.push(raw.slice(i, i + max));
+      const collation = { characters: new Map(), locations: new Map(), objects: new Map(), geography: new Map(), history: new Map(), culture: new Map(), relations: [], plotlines: [], styleSamples: [], ideas: [] };
+      const systemMsg = 'Rispondi esclusivamente con JSON valido.';
+      const focusHint = focus ? `\nFOCUS: ${focus}` : '';
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const prompt = `${header}${focusHint}\n\nESTRATTO ${ci+1}/${chunks.length}:\n${chunks[ci]}`;
+        try {
+          const { text } = await AIService.complete({ prompt, system: systemMsg, temperature: 0.2, maxTokens: 900 });
+          const stripped = text.replace(/^```[a-zA-Z]*\n?|```$/g, '').trim();
+          const jsonStart = stripped.indexOf('{');
+          const jsonEnd = stripped.lastIndexOf('}');
+          let body = jsonStart >= 0 ? stripped.slice(jsonStart, jsonEnd + 1) : '{}';
+          body = body.replace(/,\s*([}\]])/g, '$1').replace(/([,{]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+          const parsed = JSON.parse(body);
+          const addList = (lst, map, key='name') => {(lst||[]).forEach(it => { const k = (it?.[key]||'').toLowerCase(); if (!k) return; const prev = map.get(k)||it; map.set(k, { ...prev, ...it }); });};
+          addList(parsed.characters, collation.characters);
+          addList(parsed.locations, collation.locations);
+          addList(parsed.objects, collation.objects);
+          addList(parsed.geography, collation.geography);
+          addList(parsed.history, collation.history);
+          addList(parsed.culture, collation.culture);
+          collation.relations.push(...(parsed.relations||[]));
+          collation.plotlines.push(...(parsed.plotlines||[]));
+          if (parsed.style) collation.styleSamples.push(parsed.style);
+          if (Array.isArray(parsed.ideas)) collation.ideas.push(...parsed.ideas.filter(it => (it?.title || it?.content)));
+        } catch {}
+      }
+      entities.characters = Array.from(collation.characters.values());
+      entities.locations = Array.from(collation.locations.values());
+      entities.objects = Array.from(collation.objects.values());
+      entities.geography = Array.from(collation.geography.values());
+      entities.history = Array.from(collation.history.values());
+      entities.culture = Array.from(collation.culture.values());
+      relations = collation.relations;
+      plotlines = collation.plotlines;
+      if ((!ideasFromDoc || ideasFromDoc.length === 0) && collation.ideas.length) {
+        const seen = new Set();
+        ideasFromDoc = collation.ideas.filter(it => { const key = `${(it.title||'').toLowerCase()}::${(it.content||'').toLowerCase()}`; if (seen.has(key)) return false; seen.add(key); return true; });
+      }
+      if (collation.styleSamples.length) {
+        const tones = {}; for (const s of collation.styleSamples) { if (s?.tone) tones[s.tone] = (tones[s.tone]||0)+1; }
+        const topTone = Object.entries(tones).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
+        style = { ...(collation.styleSamples[0]||{}), tone: topTone };
+      }
+    }
+    return { scenes, entities, relations, plotlines, style, ideas: ideasFromDoc };
+  };
+  const result = await run();
+  await commitToProject(dataManager, projectId, result, { mode });
+  return { ok: true, scenes: result.scenes?.length || 0, ideas: result.ideas?.length || 0, characters: result.entities?.characters?.length || 0 };
 }
 
 export default { init, show, hide, open };

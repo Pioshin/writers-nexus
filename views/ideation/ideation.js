@@ -151,7 +151,7 @@ async function loadIdeas() {
                 newIdeaModal.open(idea);
             },
             onDelete: async () => {
-                if (confirm('Eliminare questa idea?')) {
+                if (await window.appConfirm('Eliminare questa idea?', { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('ideas', idea.id);
                     loadIdeas();
                 }
@@ -288,7 +288,7 @@ async function loadCharacters() {
             positionClass: 'overlay-actions', // Using the new shared class
             onEdit: () => characterModal.open(character),
             onDelete: async () => {
-                if (confirm(`Sei sicuro di voler eliminare ${character.name}?`)) {
+                if (await window.appConfirm(`Sei sicuro di voler eliminare ${character.name}?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('characters', character.id);
                     loadCharacters();
                 }
@@ -500,7 +500,7 @@ async function loadLocations() {
         overlayModule.addOverlayTo(el, {
             onEdit: () => locationModal.open(loc),
             onDelete: async () => {
-                if (confirm(`Eliminare il luogo \"${loc.name}\"?`)) {
+                if (await window.appConfirm(`Eliminare il luogo \"${loc.name}\"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('locations', loc.id);
                     loadLocations();
                 }
@@ -531,7 +531,7 @@ async function loadObjects() {
         overlayModule.addOverlayTo(el, {
             onEdit: () => objectModal.open(obj),
             onDelete: async () => {
-                if (confirm(`Eliminare l'oggetto \"${obj.name}\"?`)) {
+                if (await window.appConfirm(`Eliminare l'oggetto \"${obj.name}\"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('objects', obj.id);
                     loadObjects();
                 }
@@ -562,7 +562,7 @@ async function loadSystems() {
         overlayModule.addOverlayTo(el, {
             onEdit: () => systemModal.open(sys),
             onDelete: async () => {
-                if (confirm(`Eliminare il sistema \"${sys.name}\"?`)) {
+                if (await window.appConfirm(`Eliminare il sistema \"${sys.name}\"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' })) {
                     await DataManager.deleteProjectItem('systems', sys.id);
                     loadSystems();
                 }

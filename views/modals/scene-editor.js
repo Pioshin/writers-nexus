@@ -1,4 +1,5 @@
 import { DataManager } from '../../DataManager.js';
+import { toast } from '../shared/toast.js';
 
 let modal, form, titleEl, synopsisEl, sceneIdInput, stageKeyInput, saveBtn, cancelBtn, modalTitle;
 
@@ -47,10 +48,7 @@ async function save() {
         // or preserved if it's an existing one.
     };
 
-    if (!sceneData.title || !sceneData.stageKey) {
-        alert('Il titolo e la tappa sono obbligatori.');
-        return;
-    }
+    if (!sceneData.title || !sceneData.stageKey) { toast.error('Il titolo e la tappa sono obbligatori.'); return; }
 
     const savedScene = await DataManager.saveScene(sceneData);
     

@@ -197,7 +197,7 @@ function updateWordCount() {
     const blocks = blocksContainer.querySelectorAll('[contenteditable]');
     let total = 0;
     blocks.forEach(b => {
-        const text = b.innerText.trim();
+    const text = (b.textContent || '').trim();
         const words = text.match(/\S+/g);
         total += words ? words.length : 0;
     });
@@ -206,7 +206,7 @@ function updateWordCount() {
 
 async function saveContent() {
     if (!currentScene) return;
-    const blocks = Array.from(blocksContainer.querySelectorAll('[contenteditable]')).map(div => ({ type: 'text', content: div.innerText }));
+    const blocks = Array.from(blocksContainer.querySelectorAll('[contenteditable]')).map(div => ({ type: 'text', content: div.textContent }));
     const merged = { ...currentScene, blocks, content: blocks.map(b => b.content).join('\n\n') };
     currentScene = await DataManager.saveScene(merged);
 }
@@ -273,10 +273,10 @@ function generateManuscript(readOnly = true) {
                 p.dataset.sceneId = scene.id;
                 p.dataset.blockIndex = String(bi);
                 p.className = `${readOnly ? '' : 'outline-none focus:ring-2 focus:ring-accent rounded'} manuscript-paragraph py-1`;
-                p.textContent = b.content || '';
+        p.textContent = b.content || '';
                 if (!readOnly) {
                     p.addEventListener('input', debounce(async () => {
-                        await saveManuscriptEdit(p.dataset.sceneId, Number(p.dataset.blockIndex), p.textContent);
+            await saveManuscriptEdit(p.dataset.sceneId, Number(p.dataset.blockIndex), p.textContent);
                         updateManuscriptCounters();
                     }, 600));
                     p.addEventListener('focus', () => applyFocusState(p, true));
@@ -322,7 +322,7 @@ function updateManuscriptCounters() {
     if (!manuscriptWordsEl || !manuscriptPagesEl) return;
     const paras = manuscriptContent.querySelectorAll('.manuscript-paragraph');
     let total = 0;
-    paras.forEach(p => total += countWords(p.textContent));
+    paras.forEach(p => total += countWords(p.textContent || ''));
     manuscriptWordsEl.textContent = String(total);
     manuscriptPagesEl.textContent = (total / WORDS_PER_PAGE).toFixed(2);
 }
