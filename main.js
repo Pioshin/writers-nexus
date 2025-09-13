@@ -14,6 +14,11 @@ let authScreen, appScreen, mainNav, mainContentArea, themeSelector, showConfigBt
     let openAiBtn;
     let openImportBtn;
 let aiAssistantModal;
+let confirmModal;
+
+// --- RACE CONTROL / AI CONFIG CACHE ---
+let currentViewToken = 0; // Incremental token per prevenire race condition nei caricamenti vista
+let lastAIConfig = null;  // Cache configurazione AI per re-init selettivo
 
 // --- UI NOTIFIER ---
 const uiNotifier = {
@@ -97,23 +102,36 @@ async function initializeApp() {
     // Pre-load modals
     configModal = await loadModal('config');
     syncModal = await loadModal('sync');
+    confirmModal = await loadModal('confirm');
     aiAssistantModal = await loadModal('ai-assistant');
     importTextModal = await loadModal('import-text');
 
     setupEventListeners();
     DataManager.init(FirebaseSync, uiNotifier);
+    // Esponi un helper globale per conferme custom
+    window.appConfirm = async (message, opts={}) => {
+        try {
+            const m = confirmModal || (await loadModal('confirm'));
+            if (!m || !m.confirm) return window.confirm(message);
+            return await m.confirm(message, opts);
+        } catch {
+            return window.confirm(message);
+        }
+    };
     
     // Set initial UI states
     await updateActiveProjectIndicator();
 
-    // Init AI with settings
-    AIService.init({
+    // Init AI with settings (cache per confronti futuri)
+    const initialAI = {
         provider: settings.aiProvider || 'openai-compatible',
         baseUrl: settings.aiBaseUrl || '',
         apiKey: settings.aiApiKey || '',
         model: settings.aiModel || '',
         headers: settings.aiHeaders || {}
-    });
+    };
+    AIService.init(initialAI);
+    lastAIConfig = { ...initialAI };
 
     if (settings.firebaseConfig && settings.firebaseConfig.apiKey) {
         const initResult = await FirebaseSync.initFirebase(settings.firebaseConfig);
@@ -226,31 +244,70 @@ function setupEventListeners() {
         }
     });
 
-    // Listen for settings changes to update UI elements
-    window.addEventListener('settingschanged', updateActiveProjectIndicator);
+    // Listen for settings changes to update UI elements & AI re-init
+    window.addEventListener('settingschanged', onSettingsChanged);
+    // Project / data changes (aggiornano label progetto corrente)
+    window.addEventListener('projectchanged', updateActiveProjectIndicator);
+    window.addEventListener('datachanged', (e) => {
+        if (e.detail?.type === 'projects') updateActiveProjectIndicator();
+    });
 }
 
 async function switchView(viewName) {
+    const myToken = ++currentViewToken;
+
     document.querySelectorAll('#main-nav .nav-item').forEach(item => {
         const isTarget = item.dataset.view === viewName;
         item.classList.toggle('bg-primary', isTarget);
     });
 
+    // Placeholder di caricamento
+    mainContentArea.innerHTML = `<div class="flex items-center justify-center py-10 text-secondary text-sm"><i data-lucide="loader" class="animate-spin mr-2"></i>Caricamento ${viewName}...</div>`;
+    lucide.createIcons();
+
     try {
         const response = await fetch(`views/${viewName}/${viewName}.html`);
         if (!response.ok) throw new Error(`Could not load view: ${viewName}`);
-        mainContentArea.innerHTML = await response.text();
+        const html = await response.text();
+        if (myToken !== currentViewToken) return; // Race abort
+        mainContentArea.innerHTML = html;
 
         const module = await import(`./views/${viewName}/${viewName}.js`);
+        if (myToken !== currentViewToken) return; // Race abort
         if (module.default && typeof module.default.init === 'function') {
             module.default.init(DataManager, isOfflineMode ? null : FirebaseSync, loadModal, switchView);
         }
-        
         lucide.createIcons();
-
     } catch (error) {
+        if (myToken !== currentViewToken) return; // Evita override di errore da view successiva
         console.error("Error loading view:", error);
-        mainContentArea.innerHTML = `<p class="text-red-500">Error loading view: ${viewName}. ${error.message}</p>`;
+        mainContentArea.innerHTML = `<p class=\"text-red-500 p-4\">Error loading view: ${viewName}. ${error.message}</p>`;
+    }
+}
+
+// Gestione cambi settings (AI re-init on demand)
+async function onSettingsChanged() {
+    updateActiveProjectIndicator();
+    try {
+        const s = await DataManager.getSettings();
+        const next = {
+            provider: s.aiProvider || 'openai-compatible',
+            baseUrl: s.aiBaseUrl || '',
+            apiKey: s.aiApiKey || '',
+            model: s.aiModel || '',
+            headers: s.aiHeaders || {}
+        };
+        if (!lastAIConfig ||
+            lastAIConfig.provider !== next.provider ||
+            lastAIConfig.baseUrl !== next.baseUrl ||
+            lastAIConfig.apiKey !== next.apiKey ||
+            lastAIConfig.model !== next.model) {
+            AIService.init(next);
+            lastAIConfig = { ...next };
+            console.info('[AI] Re-inizializzata per modifica configurazione.');
+        }
+    } catch (err) {
+        console.warn('[AI] Aggiornamento configurazione fallito:', err);
     }
 }
 
@@ -262,7 +319,6 @@ async function loadModal(modalName) {
     // Per ora, ci basiamo sulla presenza dell'elemento nel DOM e assumiamo che il modulo sia caricato
     if (document.getElementById(modalId)) {
         try {
-            // Re-importa per ottenere l'oggetto del modulo con le sue esportazioni
             module = await import(`./views/modals/${modalName}.js`);
             return module.default;
         } catch (e) {
@@ -274,14 +330,16 @@ async function loadModal(modalName) {
     try {
         const response = await fetch(`views/modals/${modalName}.html`);
         if (!response.ok) throw new Error(`Could not load modal HTML: ${modalName}`);
-        
-        const modalContent = document.createElement('div');
-        modalContent.innerHTML = await response.text();
-        modalContainer.appendChild(modalContent.firstElementChild);
+
+        const frag = document.createDocumentFragment();
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = await response.text();
+        frag.appendChild(wrapper.firstElementChild);
+        modalContainer.appendChild(frag);
 
         module = await import(`./views/modals/${modalName}.js`);
         if (module.default && typeof module.default.init === 'function') {
-            module.default.init(DataManager, loadModal, switchView); // Passa le dipendenze necessarie
+            try { module.default.init(DataManager, loadModal, switchView); } catch { module.default.init(); }
             return module.default;
         }
         return null;
