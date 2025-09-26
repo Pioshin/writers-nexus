@@ -144,7 +144,8 @@ async function initializeApp() {
   const initialAI = {
     provider: settings.aiProvider || 'openai-compatible',
     baseUrl: settings.aiBaseUrl || '',
-    apiKey: settings.aiApiKey || '',
+    // Backward-compat: prefer aiApiKey, fallback to legacy geminiApiKey
+    apiKey: settings.aiApiKey || settings.geminiApiKey || '',
     model: settings.aiModel || '',
     headers: settings.aiHeaders || {},
   };
@@ -322,7 +323,8 @@ async function onSettingsChanged() {
     const next = {
       provider: s.aiProvider || 'openai-compatible',
       baseUrl: s.aiBaseUrl || '',
-      apiKey: s.aiApiKey || '',
+      // Backward-compat: prefer aiApiKey, fallback to legacy geminiApiKey
+      apiKey: s.aiApiKey || s.geminiApiKey || '',
       model: s.aiModel || '',
       headers: s.aiHeaders || {},
     };

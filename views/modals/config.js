@@ -10,6 +10,7 @@ let modal,
   jsonError;
 let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
 let genericModelContainer, googleModelContainer, configGoogleModelSelect;
+let refreshGoogleModelsBtn, googleModelsStatusEl;
 
 function init() {
   modal = document.getElementById('config-modal');
@@ -26,10 +27,13 @@ function init() {
   genericModelContainer = document.getElementById('generic-model-container');
   googleModelContainer = document.getElementById('google-model-container');
   configGoogleModelSelect = document.getElementById('config-google-model');
+  refreshGoogleModelsBtn = document.getElementById('refresh-google-models');
+  googleModelsStatusEl = document.getElementById('google-models-status');
 
   cancelBtn.addEventListener('click', close);
   saveBtn.addEventListener('click', save);
   aiProviderSelect.addEventListener('change', updateAIProviderUI);
+  refreshGoogleModelsBtn?.addEventListener('click', loadGoogleModels);
 }
 
 function updateAIProviderUI() {
@@ -59,9 +63,14 @@ async function open() {
   if (aiModelInput) aiModelInput.value = settings.aiModel || '';
   if (configGoogleModelSelect)
     configGoogleModelSelect.value = settings.aiModel || 'gemini-1.5-flash';
-  if (aiApiKeyInput) aiApiKeyInput.value = settings.aiApiKey || '';
+  if (aiApiKeyInput)
+    aiApiKeyInput.value = settings.aiApiKey || settings.geminiApiKey || '';
   jsonError.textContent = '';
   updateAIProviderUI(); // Set initial UI state
+  // Se provider Google, prova a caricare la lista modelli
+  if (aiProviderSelect?.value === 'google') {
+    await loadGoogleModels();
+  }
   modal.classList.remove('hidden');
 }
 
@@ -90,6 +99,10 @@ async function save() {
     provider === 'google'
       ? configGoogleModelSelect.value
       : aiModelInput?.value.trim() || '';
+  // Preferred AI API key field. If provider is Google and explicit aiApiKey is empty, use geminiKey for aiApiKey too.
+  const typedApiKey = aiApiKeyInput?.value.trim() || '';
+  const effectiveAiApiKey =
+    provider === 'google' ? typedApiKey || geminiKey : typedApiKey;
 
   await DataManager.saveSettings({
     geminiApiKey: geminiKey,
@@ -97,7 +110,7 @@ async function save() {
     aiProvider: provider,
     aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
     aiModel: model,
-    aiApiKey: aiApiKeyInput?.value.trim() || '',
+    aiApiKey: effectiveAiApiKey,
   });
 
   close();
@@ -106,3 +119,98 @@ async function save() {
 }
 
 export default { init, open, close };
+
+// --- Helpers ---
+function normalizeGoogleModel(model) {
+  if (!model || typeof model !== 'string') return 'gemini-1.5-flash';
+  const m = model.trim();
+
+  // Rimuovi prefissi "models/" se presenti
+  const cleanModel = m.startsWith('models/') ? m.replace('models/', '') : m;
+
+  // Mappature per compatibilità AI Studio (stesso mapping di AIService.js)
+  const modelMap = {
+    'gemini-pro': 'gemini-1.5-pro',
+    'gemini-pro-vision': 'gemini-1.5-pro',
+    // Rimuovi suffissi -latest che possono causare problemi
+    'gemini-1.5-pro-latest': 'gemini-1.5-pro',
+    'gemini-1.5-flash-latest': 'gemini-1.5-flash',
+    'gemini-1.0-pro-latest': 'gemini-1.0-pro',
+    // Varianti comuni che potrebbero non funzionare
+    'gemini-1.5-pro-002': 'gemini-1.5-pro',
+    'gemini-1.5-flash-001': 'gemini-1.5-flash',
+  };
+
+  return modelMap[cleanModel] || cleanModel;
+}
+
+async function loadGoogleModels() {
+  if (!googleModelContainer || !configGoogleModelSelect) return;
+  const apiKey =
+    aiApiKeyInput?.value?.trim() || geminiApiKeyInput?.value?.trim() || '';
+  googleModelsStatusEl.textContent = 'Caricamento modelli…';
+  configGoogleModelSelect.innerHTML =
+    '<option value="" disabled>Carica modelli...</option>';
+  if (!apiKey) {
+    googleModelsStatusEl.textContent =
+      'Inserisci una API Key di AI Studio per caricare i modelli.';
+    return;
+  }
+  try {
+    // Endpoint pubblico AI Studio models list
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const items = Array.isArray(data.models) ? data.models : [];
+    const rawOptions = items
+      .map(m => m?.name)
+      .filter(Boolean)
+      .map(n => (n.includes('/') ? n.split('/').pop() : n))
+      .filter(n => n.startsWith('gemini-'))
+      .map(n => normalizeGoogleModel(n))
+      .filter((v, i, a) => a.indexOf(v) === i);
+
+    // Mantieni selezione precedente, fallback se vuota
+    const prev = configGoogleModelSelect.value;
+    const defaultModels = [
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-1.0-pro',
+    ];
+    const finalList = rawOptions.length ? rawOptions : defaultModels;
+    configGoogleModelSelect.innerHTML = '';
+    for (const m of finalList) {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      configGoogleModelSelect.appendChild(opt);
+    }
+    if (prev && finalList.includes(prev)) configGoogleModelSelect.value = prev;
+    googleModelsStatusEl.textContent = rawOptions.length
+      ? `Modelli caricati: ${rawOptions.length}`
+      : 'Nessun elenco disponibile: uso set di default';
+  } catch (e) {
+    console.warn('Impossibile caricare modelli Gemini:', e);
+    const errorMsg = e.message?.includes('403')
+      ? 'API Key non valida o senza permessi'
+      : e.message?.includes('404')
+        ? 'Endpoint non trovato - verifica la configurazione'
+        : `Errore: ${e.message}`;
+
+    configGoogleModelSelect.innerHTML = '';
+    const defaultModels = [
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-1.0-pro',
+    ];
+    for (const m of defaultModels) {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      configGoogleModelSelect.appendChild(opt);
+    }
+    googleModelsStatusEl.textContent = `${errorMsg}. Uso modelli di default.`;
+  }
+}

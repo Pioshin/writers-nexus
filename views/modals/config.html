@@ -4,8 +4,9 @@
   >
     <h3 class="text-2xl font-display mb-4">Configurazione Backend</h3>
     <p class="text-secondary mb-6 text-sm">
-      Incolla qui l'oggetto di configurazione del tuo progetto Firebase e la
-      chiave API di Google Gemini. I dati verranno salvati solo nel tuo browser.
+      Incolla qui l'oggetto di configurazione del tuo progetto Firebase e le
+      chiavi/API dell'assistente IA che desideri usare. I dati vengono salvati
+      solo nel tuo browser.
     </p>
     <form id="config-form" class="flex-grow overflow-y-auto pr-4 space-y-3">
       <section class="space-y-2">
@@ -42,17 +43,28 @@
             />
           </div>
           <div id="google-model-container" class="hidden">
-            <label class="block text-xs text-secondary mb-1"
-              >Modello (Gemini)</label
-            >
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs text-secondary"
+                >Modello (Gemini)</label
+              >
+              <button
+                type="button"
+                id="refresh-google-models"
+                class="text-xs text-secondary hover:accent"
+              >
+                Ricarica
+              </button>
+            </div>
             <select
               id="config-google-model"
               class="w-full px-3 py-2 bg-primary border border-accent/30 rounded"
             >
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-              <option value="gemini-pro">Gemini Pro</option>
+              <option value="" disabled>Carica modelli...</option>
             </select>
+            <p
+              id="google-models-status"
+              class="mt-1 text-xs text-secondary"
+            ></p>
           </div>
           <div class="md:col-span-2">
             <label class="block text-xs text-secondary mb-1">API Key</label>
@@ -75,7 +87,6 @@
           id="config-firebase-json"
           rows="8"
           placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
-          required
           class="w-full p-3 bg-primary border border-accent/30 rounded-lg text-sm font-mono"
         ></textarea>
         <p id="config-json-error" class="text-red-400 text-xs h-4"></p>
@@ -89,8 +100,7 @@
       <input
         type="password"
         id="config-geminiApiKey"
-        placeholder="Google Gemini: API Key"
-        required
+        placeholder="Google Gemini: API Key (opzionale, usata se selezioni Google)"
         class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg text-sm"
       />
     </form>

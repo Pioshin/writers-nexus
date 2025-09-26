@@ -17,6 +17,29 @@ let config = {
 };
 let genAI = null;
 
+function normalizeGoogleModel(model) {
+  if (!model || typeof model !== 'string') return 'gemini-1.5-flash'; // fallback sicuro
+  const m = model.trim();
+
+  // Rimuovi prefissi "models/" se presenti
+  const cleanModel = m.startsWith('models/') ? m.replace('models/', '') : m;
+
+  // Mappature per compatibilità AI Studio
+  const modelMap = {
+    'gemini-pro': 'gemini-1.5-pro',
+    'gemini-pro-vision': 'gemini-1.5-pro',
+    // Rimuovi suffissi -latest che possono causare problemi
+    'gemini-1.5-pro-latest': 'gemini-1.5-pro',
+    'gemini-1.5-flash-latest': 'gemini-1.5-flash',
+    'gemini-1.0-pro-latest': 'gemini-1.0-pro',
+    // Varianti comuni che potrebbero non funzionare
+    'gemini-1.5-pro-002': 'gemini-1.5-pro',
+    'gemini-1.5-flash-001': 'gemini-1.5-flash',
+  };
+
+  return modelMap[cleanModel] || cleanModel;
+}
+
 function getHeaders() {
   const headers = { 'Content-Type': 'application/json', ...config.headers };
   if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
@@ -26,6 +49,9 @@ function getHeaders() {
 export const AIService = {
   init(opts = {}) {
     config = { ...config, ...opts };
+    if (config.provider === 'google') {
+      config.model = normalizeGoogleModel(config.model);
+    }
     if (config.provider === 'google') {
       // The client gets the API key from the environment variable `GEMINI_API_KEY` if not passed directly.
       genAI = new GoogleGenerativeAI(config.apiKey);
@@ -46,18 +72,32 @@ export const AIService = {
     if (config.provider === 'google') {
       if (!genAI)
         throw new Error('Google AI not initialized. Call init first.');
-      const model = genAI.getGenerativeModel({
-        model: config.model,
-        systemInstruction: system,
-      });
-      const result = await model.generateContent(prompt, {
-        temperature: temperature,
-        maxOutputTokens: maxTokens,
-        signal: controller.signal,
-      });
-      const response = result.response;
-      const text = response.text();
-      return { text, raw: response };
+      const modelName = normalizeGoogleModel(config.model);
+      console.debug(
+        `[Gemini] Original model: ${config.model} → Normalized: ${modelName}`
+      );
+
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          ...(system ? { systemInstruction: system } : {}),
+        });
+
+        const result = await model.generateContent(prompt, {
+          generationConfig: {
+            temperature,
+            maxOutputTokens: maxTokens,
+          },
+          signal: controller.signal,
+        });
+
+        const response = result.response;
+        const text = response.text();
+        return { text, raw: response };
+      } catch (error) {
+        console.error(`[Gemini] Error with model ${modelName}:`, error);
+        throw error;
+      }
     }
 
     let url = `${config.baseUrl}/chat/completions`;
@@ -113,21 +153,53 @@ export const AIService = {
     if (config.provider === 'google') {
       if (!genAI)
         throw new Error('Google AI not initialized. Call init first.');
-      const model = genAI.getGenerativeModel({ model: config.model });
-      const chat = model.startChat({
-        history: messages
-          .slice(0, -1)
-          .map(m => ({ role: m.role, parts: [{ text: m.content }] })),
-        temperature: temperature,
-        maxOutputTokens: maxTokens,
-      });
-      const lastMessage = messages[messages.length - 1];
-      const result = await chat.sendMessage(lastMessage.content, {
-        signal: controller.signal,
-      });
-      const response = result.response;
-      const text = response.text();
-      return { text, raw: response };
+      const modelName = normalizeGoogleModel(config.model);
+      console.debug(
+        `[Gemini Chat] Original model: ${config.model} → Normalized: ${modelName}, messages: ${messages.length}`
+      );
+
+      try {
+        const systemMessage = messages.find(m => m.role === 'system');
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          ...(systemMessage
+            ? { systemInstruction: systemMessage.content }
+            : {}),
+        });
+
+        const history = messages
+          .filter(m => m.role !== 'system') // Rimuovi i messaggi system dalla history
+          .map(m => ({
+            role: m.role === 'assistant' ? 'model' : m.role, // Gemini usa 'model' invece di 'assistant'
+            parts: [{ text: m.content }],
+          }));
+
+        if (history.length === 0) {
+          throw new Error('No non-system messages found for chat');
+        }
+
+        const last = history[history.length - 1];
+        const prior = history.slice(0, -1);
+
+        const chat = model.startChat({
+          history: prior,
+          generationConfig: {
+            temperature,
+            maxOutputTokens: maxTokens,
+          },
+        });
+
+        const result = await chat.sendMessage(last.parts[0].text, {
+          signal: controller.signal,
+        });
+
+        const response = result.response;
+        const text = response.text();
+        return { text, raw: response };
+      } catch (error) {
+        console.error(`[Gemini Chat] Error with model ${modelName}:`, error);
+        throw error;
+      }
     }
 
     let url = `${config.baseUrl}/chat/completions`;
@@ -165,4 +237,23 @@ export const AIService = {
   abort() {
     if (controller) controller.abort();
   },
+};
+
+// Helpful error hinting: wrap Google 404s with guidance
+const _origComplete = AIService.complete;
+AIService.complete = async function wrappedComplete(args) {
+  try {
+    return await _origComplete.call(AIService, args);
+  } catch (e) {
+    const msg = String(e?.message || e);
+    if (config.provider === 'google' && /404/.test(msg)) {
+      const suggestion = msg.includes('-latest')
+        ? 'I modelli con suffisso "-latest" non sono sempre supportati. Prova senza "-latest".'
+        : 'Prova modelli stabili come "gemini-1.5-flash" o "gemini-1.5-pro".';
+      throw new Error(
+        `${msg}\nSuggerimento: ${suggestion} Assicurati di usare una API Key di AI Studio (non Vertex AI).`
+      );
+    }
+    throw e;
+  }
 };
