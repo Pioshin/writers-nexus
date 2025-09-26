@@ -1,12 +1,22 @@
 import { AIService } from '../../ai/AIService.js';
 
-let modalEl, sendBtn, closeBtn, stopBtn, promptInput, outputEl, goalEl, presetEl, contextEl;
+let modalEl,
+  sendBtn,
+  closeBtn,
+  stopBtn,
+  promptInput,
+  outputEl,
+  goalEl,
+  presetEl,
+  contextEl;
 let currentMode = 'ideation';
 let fillContextBtn;
 
 function show(opts = {}) {
   modalEl.classList.remove('hidden');
-  try { window.lucide?.createIcons?.(); } catch {}
+  try {
+    window.lucide?.createIcons?.();
+  } catch {}
   // Autofocus sul prompt per scrivere subito
   setTimeout(() => promptInput?.focus(), 0);
 }
@@ -14,7 +24,9 @@ function hide() {
   modalEl.classList.add('hidden');
 }
 
-function open() { show(); }
+function open() {
+  show();
+}
 
 async function onSend() {
   const prompt = promptInput.value.trim();
@@ -24,12 +36,22 @@ async function onSend() {
   if (!prompt && !goal) return;
 
   const system = buildSystemPrompt(preset, currentMode);
-  const userPrompt = buildUserPrompt({ prompt, goal, context, mode: currentMode });
+  const userPrompt = buildUserPrompt({
+    prompt,
+    goal,
+    context,
+    mode: currentMode,
+  });
 
   appendOutput(`Tu: ${prompt || goal}`, 'user');
   setLoading(true);
   try {
-    const { text } = await AIService.complete({ prompt: userPrompt, system, temperature: 0.9, maxTokens: 900 });
+    const { text } = await AIService.complete({
+      prompt: userPrompt,
+      system,
+      temperature: 0.9,
+      maxTokens: 900,
+    });
     appendOutput(text, 'ai');
   } catch (e) {
     appendOutput(`Errore: ${e.message}`, 'error');
@@ -40,11 +62,18 @@ async function onSend() {
 
 function appendOutput(text, role = 'ai') {
   const div = document.createElement('div');
-  div.className = role === 'user' ? 'mb-2 text-secondary' : role === 'error' ? 'mb-2 text-red-400' : 'mb-4';
+  div.className =
+    role === 'user'
+      ? 'mb-2 text-secondary'
+      : role === 'error'
+        ? 'mb-2 text-red-400'
+        : 'mb-4';
   div.innerText = text;
   outputEl.appendChild(div);
   // Scroll to bottom after layout paints
-  requestAnimationFrame(() => { outputEl.scrollTop = outputEl.scrollHeight; });
+  requestAnimationFrame(() => {
+    outputEl.scrollTop = outputEl.scrollHeight;
+  });
 }
 
 function setLoading(isLoading) {
@@ -58,13 +87,13 @@ function buildSystemPrompt(preset, mode) {
     coach: `Agisci come coach creativo: aiuta a chiarire obiettivi, tema e conflitto. Suggerisci alternative e tecniche pratiche (snowflake, mind map, beat sheet).`,
     worldbuilder: `Agisci come worldbuilder: proponi elementi di lore, regole del mondo, culture e dettagli sensoriali coerenti.`,
     'story-analyst': `Agisci come analista: valuta coerenza della trama, arco del personaggio, pacing e fai domande mirate.`,
-    'scene-doctor': `Agisci come scene doctor: proponi riscritture di battute, azioni e micro-tensioni per rendere la scena più viva.`
+    'scene-doctor': `Agisci come scene doctor: proponi riscritture di battute, azioni e micro-tensioni per rendere la scena più viva.`,
   };
   const modes = {
     ideation: `Fase di ideazione: genera idee divergenti e convergenti, con titoli, logline e hook.`,
     structure: `Fase di struttura: lavora su tappe del Viaggio dell'Eroe, obiettivi per scena e turning points.`,
     writing: `Fase di scrittura: proponi paragrafi campione nello stile indicato e suggerisci continuazioni.`,
-    editing: `Fase di editing: focus su chiarezza, stile, tagli e riscritture mirate.`
+    editing: `Fase di editing: focus su chiarezza, stile, tagli e riscritture mirate.`,
   };
   return `${base}\n${presets[preset]}\n${modes[mode]}`;
 }
@@ -93,7 +122,9 @@ function init(dataManager, loadModal, switchView) {
   document.querySelectorAll('.ai-mode').forEach(btn => {
     btn.addEventListener('click', () => {
       currentMode = btn.dataset.mode;
-      document.querySelectorAll('.ai-mode').forEach(b => b.classList.remove('accent'));
+      document
+        .querySelectorAll('.ai-mode')
+        .forEach(b => b.classList.remove('accent'));
       btn.classList.add('accent');
     });
   });
@@ -107,26 +138,45 @@ function init(dataManager, loadModal, switchView) {
     const project = await dataManager.getProject(projectId);
     const scenes = await dataManager.getProjectItems(projectId, 'scenes');
     const currentSceneId = await dataManager.getCurrentSceneId();
-    const currentScene = currentSceneId ? await dataManager.getScene(currentSceneId) : null;
-    const characters = await dataManager.getProjectItems(projectId, 'characters');
+    const currentScene = currentSceneId
+      ? await dataManager.getScene(currentSceneId)
+      : null;
+    const characters = await dataManager.getProjectItems(
+      projectId,
+      'characters'
+    );
     const locations = await dataManager.getProjectItems(projectId, 'locations');
     const ideas = await dataManager.getProjectItems(projectId, 'ideas');
     const ctx = [
       project?.title ? `Titolo: ${project.title}` : null,
       project?.premise ? `Premessa: ${project.premise}` : null,
-      currentScene ? `Scena corrente: ${currentScene.title} — ${currentScene.synopsis || ''}` : null,
+      currentScene
+        ? `Scena corrente: ${currentScene.title} — ${currentScene.synopsis || ''}`
+        : null,
       scenes?.length ? `Scene totali: ${scenes.length}` : null,
-      characters?.length ? `Personaggi: ${characters.slice(0,5).map(c=>c.name).join(', ')}${characters.length>5?'…':''}` : null,
-      locations?.length ? `Luoghi: ${locations.slice(0,5).map(l=>l.name).join(', ')}${locations.length>5?'…':''}` : null,
-      ideas?.length ? `Idee esistenti: ${ideas.length}` : null
-    ].filter(Boolean).join('\n');
+      characters?.length
+        ? `Personaggi: ${characters
+            .slice(0, 5)
+            .map(c => c.name)
+            .join(', ')}${characters.length > 5 ? '…' : ''}`
+        : null,
+      locations?.length
+        ? `Luoghi: ${locations
+            .slice(0, 5)
+            .map(l => l.name)
+            .join(', ')}${locations.length > 5 ? '…' : ''}`
+        : null,
+      ideas?.length ? `Idee esistenti: ${ideas.length}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
     contextEl.value = ctx;
   });
 
   return {
     init: () => {},
-  open: () => show(),
-    hide
+    open: () => show(),
+    hide,
   };
 }
 

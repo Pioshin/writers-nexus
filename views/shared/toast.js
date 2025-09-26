@@ -24,7 +24,9 @@ function createToast(message, { type = 'info', duration = 3000 } = {}) {
 
   const close = () => {
     toast.classList.add('toast-hide');
-    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    toast.addEventListener('animationend', () => toast.remove(), {
+      once: true,
+    });
   };
   toast.querySelector('.toast-close').addEventListener('click', close);
   if (duration > 0) setTimeout(close, duration);
@@ -32,7 +34,10 @@ function createToast(message, { type = 'info', duration = 3000 } = {}) {
 
 export const toast = {
   show: createToast,
-  info: (msg, opts = {}) => createToast(msg, { type: 'info', duration: 3000, ...opts }),
-  success: (msg, opts = {}) => createToast(msg, { type: 'success', duration: 2500, ...opts }),
-  error: (msg, opts = {}) => createToast(msg, { type: 'error', duration: 5000, ...opts })
+  info: (msg, opts = {}) =>
+    createToast(msg, { type: 'info', duration: 3000, ...opts }),
+  success: (msg, opts = {}) =>
+    createToast(msg, { type: 'success', duration: 2500, ...opts }),
+  error: (msg, opts = {}) =>
+    createToast(msg, { type: 'error', duration: 5000, ...opts }),
 };

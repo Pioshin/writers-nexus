@@ -1,4 +1,0 @@
-gira in un server locale basato su node.js
-dalla cartella del progetto andare in powershell e fare
-
-npx live-server

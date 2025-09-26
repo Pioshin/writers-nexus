@@ -1,17 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writer's Nexus</title>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Orbitron:wght@400;700&family=MedievalSharp&family=Special+Elite&family=Dancing+Script&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Orbitron:wght@400;700&family=MedievalSharp&family=Special+Elite&family=Dancing+Script&display=swap"
+      rel="stylesheet"
+    />
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!-- Import Map for browser-native ES Modules -->
     <script type="importmap">
@@ -24,102 +27,195 @@
 
     <script src="idb.js"></script>
 
-    <link rel="stylesheet" href="style.css">
-
-</head>
-<body class="antialiased">
-
-    <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4 hidden">
-        <div class="w-full max-w-md bg-secondary shadow-2xl rounded-2xl p-8 space-y-6 border border-accent/20">
-            <div class="text-center relative">
-                <h1 class="text-4xl font-display accent">Writer's Nexus</h1>
-                <button id="show-config-btn" class="absolute top-0 right-0 p-2 text-secondary hover:accent transition-colors">
-                    <i data-lucide="settings"></i>
-                </button>
-                <p class="text-secondary mt-2">Il tuo copilota per la scrittura creativa.</p>
-            </div>
-            <div id="config-status" class="text-center text-xs p-2 rounded-lg"></div>
-            <form id="login-form" class="space-y-4">
-                <input id="login-email" type="email" placeholder="Email" required class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
-                <input id="login-password" type="password" placeholder="Password" required class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
-                <button id="login-submit-btn" type="submit" class="w-full text-lg font-bold py-3 bg-accent text-primary rounded-lg hover:bg-accent-hover transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed">Accedi</button>
-            </form>
-            <div class="text-center">
-                <p id="auth-error" class="text-red-400 text-sm h-4"></p>
-                <p class="text-secondary text-sm">Non hai un account? 
-                    <button id="show-register-btn" class="font-semibold accent hover:underline">Registrati</button>
-                </p>
-            </div>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="antialiased">
+    <div
+      id="auth-screen"
+      class="min-h-screen flex items-center justify-center p-4 hidden"
+    >
+      <div
+        class="w-full max-w-md bg-secondary shadow-2xl rounded-2xl p-8 space-y-6 border border-accent/20"
+      >
+        <div class="text-center relative">
+          <h1 class="text-4xl font-display accent">Writer's Nexus</h1>
+          <button
+            id="show-config-btn"
+            class="absolute top-0 right-0 p-2 text-secondary hover:accent transition-colors"
+          >
+            <i data-lucide="settings"></i>
+          </button>
+          <p class="text-secondary mt-2">
+            Il tuo copilota per la scrittura creativa.
+          </p>
         </div>
+        <div
+          id="config-status"
+          class="text-center text-xs p-2 rounded-lg"
+        ></div>
+        <form id="login-form" class="space-y-4">
+          <input
+            id="login-email"
+            type="email"
+            placeholder="Email"
+            required
+            class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <input
+            id="login-password"
+            type="password"
+            placeholder="Password"
+            required
+            class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <button
+            id="login-submit-btn"
+            type="submit"
+            class="w-full text-lg font-bold py-3 bg-accent text-primary rounded-lg hover:bg-accent-hover transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Accedi
+          </button>
+        </form>
+        <div class="text-center">
+          <p id="auth-error" class="text-red-400 text-sm h-4"></p>
+          <p class="text-secondary text-sm">
+            Non hai un account?
+            <button
+              id="show-register-btn"
+              class="font-semibold accent hover:underline"
+            >
+              Registrati
+            </button>
+          </p>
+        </div>
+      </div>
     </div>
 
     <div id="app-screen" class="hidden">
-        <div class="flex h-screen bg-primary">
-            <nav class="w-64 bg-secondary p-5 flex flex-col justify-between border-r border-accent/20">
-                <div>
-                    <div class="mb-10">
-                        <h1 class="text-3xl font-display accent">Writer's Nexus</h1>
-                        <div id="project-selector-container">
-                             <p class="text-sm text-secondary">Progetto Attivo:</p>
-                             <p id="current-project-name" class="font-bold text-lg text-primary">Nessuno</p>
-                        </div>
-                    </div>
-                    <ul class="space-y-3" id="main-nav">
-                        <li data-view="dashboard" class="nav-item flex items-center p-2 rounded-lg cursor-pointer bg-primary"><i data-lucide="layout-dashboard" class="mr-3 accent"></i><span class="font-semibold">Dashboard</span></li>
-                        <li data-view="ideation" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"><i data-lucide="brain-circuit" class="mr-3 text-secondary"></i><span>Ideazione</span></li>
-                        <li data-view="structure" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"><i data-lucide="waypoints" class="mr-3 text-secondary"></i><span>Struttura</span></li>
-                        <li data-view="writing" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"><i data-lucide="file-pen-line" class="mr-3 text-secondary"></i><span>Scrittura</span></li>
-                        <li data-view="editing" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"><i data-lucide="file-check-2" class="mr-3 text-secondary"></i><span>Editing</span></li>
-                        <li data-view="analysis" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"><i data-lucide="bar-chart-3" class="mr-3 text-secondary"></i><span>Analisi</span></li>
-                    </ul>
-                </div>
-                <div>
-                    <div class="mb-4">
-                        <label for="theme-selector" class="block text-sm font-medium text-secondary mb-1">Tema Grafico</label>
-                        <select id="theme-selector" class="w-full px-3 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
-                            <option value="scifi">Fantascienza</option><option value="fantasy">Fantasy</option><option value="thriller">Thriller</option><option value="romance">Romance</option>
-                        </select>
-                    </div>
-                    <button id="sidebar-settings-btn" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2">
-                        <i data-lucide="settings" class="mr-3 text-secondary"></i>
-                        <span class="text-primary">Impostazioni</span>
-                    </button>
-                    <button id="open-import-text" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2">
-                        <i data-lucide="download" class="mr-3 text-secondary"></i>
-                        <span class="text-primary">Importa Testo</span>
-                    </button>
-                    <button id="open-ai-assistant" class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-4">
-                        <i data-lucide="bot" class="mr-3 text-secondary"></i>
-                        <span class="text-primary">Assistente IA</span>
-                    </button>
-                    <div id="user-info" class="flex items-center p-2 bg-primary rounded-lg">
-                        <i data-lucide="user-circle-2" class="mr-3 accent"></i>
-                        <div><p id="user-email" class="text-sm font-semibold truncate"></p><button id="logout-btn" class="text-xs text-secondary hover:accent">Logout</button></div>
-                    </div>
-                </div>
-            </nav>
+      <div class="flex h-screen bg-primary">
+        <nav
+          class="w-64 bg-secondary p-5 flex flex-col justify-between border-r border-accent/20"
+        >
+          <div>
+            <div class="mb-10">
+              <h1 class="text-3xl font-display accent">Writer's Nexus</h1>
+              <div id="project-selector-container">
+                <p class="text-sm text-secondary">Progetto Attivo:</p>
+                <p
+                  id="current-project-name"
+                  class="font-bold text-lg text-primary"
+                >
+                  Nessuno
+                </p>
+              </div>
+            </div>
+            <ul class="space-y-3" id="main-nav">
+              <li
+                data-view="dashboard"
+                class="nav-item flex items-center p-2 rounded-lg cursor-pointer bg-primary"
+              >
+                <i data-lucide="layout-dashboard" class="mr-3 accent"></i
+                ><span class="font-semibold">Dashboard</span>
+              </li>
+              <li
+                data-view="ideation"
+                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
+              >
+                <i data-lucide="brain-circuit" class="mr-3 text-secondary"></i
+                ><span>Ideazione</span>
+              </li>
+              <li
+                data-view="structure"
+                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
+              >
+                <i data-lucide="waypoints" class="mr-3 text-secondary"></i
+                ><span>Struttura</span>
+              </li>
+              <li
+                data-view="writing"
+                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
+              >
+                <i data-lucide="file-pen-line" class="mr-3 text-secondary"></i
+                ><span>Scrittura</span>
+              </li>
+              <li
+                data-view="editing"
+                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
+              >
+                <i data-lucide="file-check-2" class="mr-3 text-secondary"></i
+                ><span>Editing</span>
+              </li>
+              <li
+                data-view="analysis"
+                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
+              >
+                <i data-lucide="bar-chart-3" class="mr-3 text-secondary"></i
+                ><span>Analisi</span>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <div class="mb-4">
+              <label
+                for="theme-selector"
+                class="block text-sm font-medium text-secondary mb-1"
+                >Tema Grafico</label
+              >
+              <select
+                id="theme-selector"
+                class="w-full px-3 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="scifi">Fantascienza</option>
+                <option value="fantasy">Fantasy</option>
+                <option value="thriller">Thriller</option>
+                <option value="romance">Romance</option>
+              </select>
+            </div>
+            <button
+              id="sidebar-settings-btn"
+              class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2"
+            >
+              <i data-lucide="settings" class="mr-3 text-secondary"></i>
+              <span class="text-primary">Impostazioni</span>
+            </button>
+            <button
+              id="open-import-text"
+              class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2"
+            >
+              <i data-lucide="download" class="mr-3 text-secondary"></i>
+              <span class="text-primary">Importa Testo</span>
+            </button>
+            <button
+              id="open-ai-assistant"
+              class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-4"
+            >
+              <i data-lucide="bot" class="mr-3 text-secondary"></i>
+              <span class="text-primary">Assistente IA</span>
+            </button>
+            <div
+              id="user-info"
+              class="flex items-center p-2 bg-primary rounded-lg"
+            >
+              <i data-lucide="user-circle-2" class="mr-3 accent"></i>
+              <div>
+                <p id="user-email" class="text-sm font-semibold truncate"></p>
+                <button
+                  id="logout-btn"
+                  class="text-xs text-secondary hover:accent"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </nav>
 
-            <main class="flex-1 p-8 overflow-y-auto" id="main-content-area">
-            </main>
-        </div>
+        <main class="flex-1 p-8 overflow-y-auto" id="main-content-area"></main>
+      </div>
     </div>
-
-    
-    
-    
-
-    
-    
-    
-
-    
-
-    
-    
-    
 
     <div id="modal-container"></div>
 
     <script type="module" src="main.js"></script>
-</body>
+  </body>
 </html>

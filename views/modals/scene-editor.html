@@ -1,23 +1,58 @@
 <div id="scene-editor-modal" class="modal-backdrop hidden">
-    <div class="bg-secondary w-full max-w-xl rounded-2xl p-8 border border-accent/20 flex flex-col">
-        <h3 id="scene-editor-title" class="text-2xl font-display mb-4">Crea Nuova Scena</h3>
-        <form id="scene-editor-form" class="flex-grow overflow-y-auto pr-4 space-y-4">
-            <input type="hidden" id="scene-id">
-            <input type="hidden" id="scene-stage-key">
-            
-            <div>
-                <label for="scene-title" class="text-sm font-semibold text-secondary">Titolo della Scena</label>
-                <input id="scene-title" type="text" placeholder="Es: L'inseguimento sui tetti" required class="w-full mt-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg">
-            </div>
-            
-            <div>
-                <label for="scene-synopsis" class="text-sm font-semibold text-secondary">Sinossi della Scena</label>
-                <textarea id="scene-synopsis" placeholder="Riassumi cosa succede in questa scena..." rows="6" required class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"></textarea>
-            </div>
-        </form>
-        <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
-            <button type="button" id="cancel-scene-btn" class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80">Annulla</button>
-            <button type="button" id="save-scene-btn" class="px-6 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover">Salva Scena</button>
-        </div>
+  <div
+    class="bg-secondary w-full max-w-xl rounded-2xl p-8 border border-accent/20 flex flex-col"
+  >
+    <h3 id="scene-editor-title" class="text-2xl font-display mb-4">
+      Crea Nuova Scena
+    </h3>
+    <form
+      id="scene-editor-form"
+      class="flex-grow overflow-y-auto pr-4 space-y-4"
+    >
+      <input type="hidden" id="scene-id" />
+      <input type="hidden" id="scene-stage-key" />
+
+      <div>
+        <label for="scene-title" class="text-sm font-semibold text-secondary"
+          >Titolo della Scena</label
+        >
+        <input
+          id="scene-title"
+          type="text"
+          placeholder="Es: L'inseguimento sui tetti"
+          required
+          class="w-full mt-1 px-4 py-2 bg-primary border border-accent/30 rounded-lg"
+        />
+      </div>
+
+      <div>
+        <label for="scene-synopsis" class="text-sm font-semibold text-secondary"
+          >Sinossi della Scena</label
+        >
+        <textarea
+          id="scene-synopsis"
+          placeholder="Riassumi cosa succede in questa scena..."
+          rows="6"
+          required
+          class="w-full mt-1 p-3 bg-primary rounded-lg border border-accent/30"
+        ></textarea>
+      </div>
+    </form>
+    <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
+      <button
+        type="button"
+        id="cancel-scene-btn"
+        class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80"
+      >
+        Annulla
+      </button>
+      <button
+        type="button"
+        id="save-scene-btn"
+        class="px-6 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover"
+      >
+        Salva Scena
+      </button>
     </div>
+  </div>
 </div>

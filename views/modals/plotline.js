@@ -1,20 +1,39 @@
 import { DataManager } from '../../DataManager.js';
 import { toast } from '../shared/toast.js';
 
-let modal, listEl, form, idEl, nameEl, typeEl, colorEl, statusEl, loglineEl, descriptionEl, beatsEl;
+let modal,
+  listEl,
+  form,
+  idEl,
+  nameEl,
+  typeEl,
+  colorEl,
+  statusEl,
+  loglineEl,
+  descriptionEl,
+  beatsEl;
 let saveBtn, cancelBtn, newBtn, addBeatBtn, deleteBtn;
-let lastFocused = null; let trapCleanup = null;
+let lastFocused = null;
+let trapCleanup = null;
 
 function trapFocus(container) {
-  const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-  const nodes = Array.from(container.querySelectorAll(FOCUSABLE)).filter(el => !el.disabled && el.offsetParent !== null);
+  const FOCUSABLE =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const nodes = Array.from(container.querySelectorAll(FOCUSABLE)).filter(
+    el => !el.disabled && el.offsetParent !== null
+  );
   if (!nodes.length) return () => {};
   const first = nodes[0];
   const last = nodes[nodes.length - 1];
   function handle(e) {
     if (e.key === 'Tab') {
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     } else if (e.key === 'Escape') {
       hide();
     }
@@ -26,7 +45,7 @@ function trapFocus(container) {
 let currentProjectId;
 
 function beatRowTemplate(beat) {
-  const id = beat.id || `beat-${Math.random().toString(36).slice(2,9)}`;
+  const id = beat.id || `beat-${Math.random().toString(36).slice(2, 9)}`;
   const stage = beat.stage || '';
   const title = beat.title || '';
   const summary = beat.summary || '';
@@ -41,15 +60,15 @@ function beatRowTemplate(beat) {
         <label class="text-xs text-secondary">Stage</label>
         <select class="beat-stage w-full mt-1 px-2 py-1 bg-secondary border border-accent/20 rounded">
           <option value="">—</option>
-          <option value="hook" ${stage==='hook'?'selected':''}>Hook</option>
-          <option value="inciting" ${stage==='inciting'?'selected':''}>Inciting</option>
-          <option value="plot_point_1" ${stage==='plot_point_1'?'selected':''}>First Plot Point</option>
-          <option value="pinch_1" ${stage==='pinch_1'?'selected':''}>First Pinch</option>
-          <option value="midpoint" ${stage==='midpoint'?'selected':''}>Midpoint</option>
-          <option value="pinch_2" ${stage==='pinch_2'?'selected':''}>Second Pinch</option>
-          <option value="plot_point_2" ${stage==='plot_point_2'?'selected':''}>Second Plot Point</option>
-          <option value="climax" ${stage==='climax'?'selected':''}>Climax</option>
-          <option value="resolution" ${stage==='resolution'?'selected':''}>Resolution</option>
+          <option value="hook" ${stage === 'hook' ? 'selected' : ''}>Hook</option>
+          <option value="inciting" ${stage === 'inciting' ? 'selected' : ''}>Inciting</option>
+          <option value="plot_point_1" ${stage === 'plot_point_1' ? 'selected' : ''}>First Plot Point</option>
+          <option value="pinch_1" ${stage === 'pinch_1' ? 'selected' : ''}>First Pinch</option>
+          <option value="midpoint" ${stage === 'midpoint' ? 'selected' : ''}>Midpoint</option>
+          <option value="pinch_2" ${stage === 'pinch_2' ? 'selected' : ''}>Second Pinch</option>
+          <option value="plot_point_2" ${stage === 'plot_point_2' ? 'selected' : ''}>Second Plot Point</option>
+          <option value="climax" ${stage === 'climax' ? 'selected' : ''}>Climax</option>
+          <option value="resolution" ${stage === 'resolution' ? 'selected' : ''}>Resolution</option>
         </select>
       </div>
       <div class="md:col-span-2">
@@ -76,22 +95,28 @@ async function loadList() {
   currentProjectId = projectId;
   const items = await DataManager.getProjectItems(projectId, 'plotlines');
   if (!items || items.length === 0) {
-    listEl.innerHTML = '<p class="text-xs text-secondary p-2">Nessuna linea.</p>';
+    listEl.innerHTML =
+      '<p class="text-xs text-secondary p-2">Nessuna linea.</p>';
     return;
   }
   items.forEach(pl => {
     const row = document.createElement('div');
-    row.className = 'flex items-center justify-between px-3 py-2 hover:bg-secondary border-b border-accent/10';
+    row.className =
+      'flex items-center justify-between px-3 py-2 hover:bg-secondary border-b border-accent/10';
     const left = document.createElement('button');
     left.className = 'flex-1 text-left';
-    left.innerHTML = `<span class="inline-block w-3 h-3 rounded mr-2" style="background:${pl.color||'#22d3ee'}"></span>${pl.name}`;
+    left.innerHTML = `<span class="inline-block w-3 h-3 rounded mr-2" style="background:${pl.color || '#22d3ee'}"></span>${pl.name}`;
     left.addEventListener('click', () => fillForm(pl));
     const del = document.createElement('button');
-    del.className = 'text-xs px-2 py-1 bg-red-500/20 text-red-300 rounded border border-red-500/40 ml-2';
+    del.className =
+      'text-xs px-2 py-1 bg-red-500/20 text-red-300 rounded border border-red-500/40 ml-2';
     del.textContent = 'Elimina';
-    del.addEventListener('click', async (e) => {
+    del.addEventListener('click', async e => {
       e.stopPropagation();
-      const ok = await window.appConfirm(`Eliminare la linea "${pl.name}"?`, { title: 'Conferma eliminazione', confirmText: 'Elimina' });
+      const ok = await window.appConfirm(`Eliminare la linea "${pl.name}"?`, {
+        title: 'Conferma eliminazione',
+        confirmText: 'Elimina',
+      });
       if (!ok) return;
       await DataManager.deleteProjectItem('plotlines', pl.id);
       // se stiamo visualizzando questa linea, reset
@@ -106,7 +131,16 @@ async function loadList() {
 }
 
 function newPlotline() {
-  fillForm({ id: '', name: '', type: 'subplot', color: '#22d3ee', status: 'active', logline: '', description: '', beats: [] });
+  fillForm({
+    id: '',
+    name: '',
+    type: 'subplot',
+    color: '#22d3ee',
+    status: 'active',
+    logline: '',
+    description: '',
+    beats: [],
+  });
 }
 
 function fillForm(pl) {
@@ -140,13 +174,18 @@ function collectBeats() {
     title: r.querySelector('.beat-title').value.trim(),
     stage: r.querySelector('.beat-stage').value,
     summary: r.querySelector('.beat-summary').value.trim(),
-    sceneIds: Array.from(r.querySelectorAll('.beat-scenes-multi option:checked')).map(o => o.value)
+    sceneIds: Array.from(
+      r.querySelectorAll('.beat-scenes-multi option:checked')
+    ).map(o => o.value),
   }));
 }
 
 async function save() {
   const name = nameEl.value.trim();
-  if (!name) { toast.error('Titolo linea obbligatorio.'); return; }
+  if (!name) {
+    toast.error('Titolo linea obbligatorio.');
+    return;
+  }
   const pl = {
     id: idEl.value || undefined,
     projectId: currentProjectId,
@@ -156,9 +195,13 @@ async function save() {
     status: statusEl.value,
     logline: loglineEl.value.trim(),
     description: descriptionEl.value.trim(),
-    beats: collectBeats()
+    beats: collectBeats(),
   };
-  const saved = await DataManager.saveProjectItem(currentProjectId, 'plotlines', pl);
+  const saved = await DataManager.saveProjectItem(
+    currentProjectId,
+    'plotlines',
+    pl
+  );
   fillForm(saved);
   await loadList();
   toast.success('Linea salvata.');
@@ -166,8 +209,14 @@ async function save() {
 
 async function remove() {
   const id = idEl.value;
-  if (!id) { toast.error('Seleziona una linea da eliminare.'); return; }
-  const ok = await window.appConfirm('Eliminare questa linea narrativa?', { title: 'Conferma', confirmText: 'Elimina' });
+  if (!id) {
+    toast.error('Seleziona una linea da eliminare.');
+    return;
+  }
+  const ok = await window.appConfirm('Eliminare questa linea narrativa?', {
+    title: 'Conferma',
+    confirmText: 'Elimina',
+  });
   if (!ok) return;
   await DataManager.deleteProjectItem('plotlines', id);
   newPlotline();
@@ -175,7 +224,7 @@ async function remove() {
 }
 
 function bindBeatDeletes() {
-  beatsEl.addEventListener('click', (e) => {
+  beatsEl.addEventListener('click', e => {
     const btn = e.target.closest('.beat-del-btn');
     if (!btn) return;
     btn.closest('.beat-row')?.remove();
@@ -205,7 +254,10 @@ function init() {
   newBtn.addEventListener('click', newPlotline);
   addBeatBtn.addEventListener('click', addBeat);
   deleteBtn.addEventListener('click', remove);
-  form.addEventListener('submit', (e) => { e.preventDefault(); save(); });
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    save();
+  });
   bindBeatDeletes();
 
   loadList();
@@ -220,8 +272,15 @@ function open() {
 
 function hide() {
   modal.classList.add('hidden');
-  if (trapCleanup) { trapCleanup(); trapCleanup = null; }
-  if (lastFocused && typeof lastFocused.focus === 'function') { try { lastFocused.focus(); } catch {} }
+  if (trapCleanup) {
+    trapCleanup();
+    trapCleanup = null;
+  }
+  if (lastFocused && typeof lastFocused.focus === 'function') {
+    try {
+      lastFocused.focus();
+    } catch {}
+  }
   lastFocused = null;
 }
 
@@ -231,10 +290,21 @@ export default { init, open, hide };
 async function hydrateBeatSelects() {
   if (!currentProjectId) return;
   const scenes = await DataManager.getProjectItems(currentProjectId, 'scenes');
-  const optionsHtml = (scenes||[]).sort((a,b)=> (a.order??0)-(b.order??0)).map(s=>`<option value="${s.id}">${(s.order??'')+'. '+(s.title||'Scena')}</option>`).join('');
+  const optionsHtml = (scenes || [])
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map(
+      s =>
+        `<option value="${s.id}">${(s.order ?? '') + '. ' + (s.title || 'Scena')}</option>`
+    )
+    .join('');
   beatsEl.querySelectorAll('.beat-scenes-multi').forEach(sel => {
     const initial = sel.getAttribute('data-initial');
-    const selected = initial ? initial.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    const selected = initial
+      ? initial
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+      : [];
     sel.innerHTML = optionsHtml;
     selected.forEach(id => {
       const opt = sel.querySelector(`option[value="${id}"]`);
