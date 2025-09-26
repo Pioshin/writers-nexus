@@ -1,0 +1,23 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "rules": {
+    "selector-class-pattern": null,
+    "color-hex-length": "short",
+    "alpha-value-notation": "percentage",
+    "color-function-notation": "modern",
+    "declaration-block-single-line-max-declarations": null,
+    "rule-empty-line-before": ["always", {
+      "except": ["first-nested"],
+      "ignore": ["after-comment"]
+    }],
+    "at-rule-empty-line-before": ["always", {
+      "except": ["first-nested"],
+      "ignore": ["after-comment", "blockless-after-same-name-blockless"]
+    }],
+    "comment-empty-line-before": ["always", {
+      "except": ["first-nested"],
+      "ignore": ["stylelint-commands"]
+    }],
+    "declaration-block-no-redundant-longhand-properties": null
+  }
+}

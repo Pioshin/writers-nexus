@@ -1,0 +1,124 @@
+<div id="config-modal" class="modal-backdrop hidden">
+  <div
+    class="bg-secondary w-full max-w-2xl rounded-2xl p-8 border border-accent/20 flex flex-col"
+  >
+    <h3 class="text-2xl font-display mb-4">Configurazione Backend</h3>
+    <p class="text-secondary mb-6 text-sm">
+      Incolla qui l'oggetto di configurazione del tuo progetto Firebase e le
+      chiavi/API dell'assistente IA che desideri usare. I dati vengono salvati
+      solo nel tuo browser.
+    </p>
+    <form id="config-form" class="flex-grow overflow-y-auto pr-4 space-y-3">
+      <section class="space-y-2">
+        <h4 class="text-sm text-secondary">Assistente IA</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-secondary mb-1">Provider</label>
+            <select
+              id="config-ai-provider"
+              class="w-full px-3 py-2 bg-primary border border-accent/30 rounded"
+            >
+              <option value="openai-compatible">OpenAI compatibile</option>
+              <option value="google">Google (Gemini)</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="ollama">Ollama (locale)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-secondary mb-1"
+              >Base URL (OpenAI-compatibile)</label
+            >
+            <input
+              id="config-ai-baseurl"
+              class="w-full px-3 py-2 bg-primary border border-accent/30 rounded"
+              placeholder="https://api.openai.com/v1"
+            />
+          </div>
+          <div id="generic-model-container">
+            <label class="block text-xs text-secondary mb-1">Modello</label>
+            <input
+              id="config-ai-model"
+              class="w-full px-3 py-2 bg-primary border border-accent/30 rounded"
+              placeholder="gpt-4o-mini"
+            />
+          </div>
+          <div id="google-model-container" class="hidden">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs text-secondary"
+                >Modello (Gemini)</label
+              >
+              <button
+                type="button"
+                id="refresh-google-models"
+                class="text-xs text-secondary hover:accent"
+              >
+                Ricarica
+              </button>
+            </div>
+            <select
+              id="config-google-model"
+              class="w-full px-3 py-2 bg-primary border border-accent/30 rounded"
+            >
+              <option value="" disabled>Carica modelli...</option>
+            </select>
+            <p
+              id="google-models-status"
+              class="mt-1 text-xs text-secondary"
+            ></p>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs text-secondary mb-1">API Key</label>
+            <input
+              id="config-ai-apikey"
+              type="password"
+              class="w-full px-3 py-2 bg-primary border border-accent/30 rounded"
+              placeholder="sk-..."
+            />
+          </div>
+        </div>
+      </section>
+      <div>
+        <label
+          for="config-firebase-json"
+          class="text-sm font-semibold text-secondary"
+          >Configurazione Firebase (JSON)</label
+        >
+        <textarea
+          id="config-firebase-json"
+          rows="8"
+          placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
+          class="w-full p-3 bg-primary border border-accent/30 rounded-lg text-sm font-mono"
+        ></textarea>
+        <p id="config-json-error" class="text-red-400 text-xs h-4"></p>
+        <hr class="border-accent/20 my-4" />
+      </div>
+      <label
+        for="config-geminiApiKey"
+        class="text-sm font-semibold text-secondary"
+        >Chiave API Gemini</label
+      >
+      <input
+        type="password"
+        id="config-geminiApiKey"
+        placeholder="Google Gemini: API Key (opzionale, usata se selezioni Google)"
+        class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg text-sm"
+      />
+    </form>
+    <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
+      <button
+        type="button"
+        id="cancel-config-modal"
+        class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80"
+      >
+        Annulla
+      </button>
+      <button
+        type="button"
+        id="save-config-btn"
+        class="px-6 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover"
+      >
+        Salva Configurazione
+      </button>
+    </div>
+  </div>
+</div>

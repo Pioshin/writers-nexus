@@ -1,338 +1,388 @@
 import { DataManager } from './DataManager.js';
+import { FirebaseSync } from './FirebaseSync.js';
+import { ThemeManager } from './ThemeManager.js';
+import { AIService } from './ai/AIService.js';
 
 // --- STATE ---
-let GEMINI_API_KEY = null;
+let isOfflineMode = false;
+let syncModal = null;
+let configModal = null;
+let importTextModal = null;
 
 // --- DOM ELEMENT VARIABLES ---
-let authScreen, appScreen, mainNav, contentPanels, themeSelector, showConfigBtn, configModal, configForm, saveConfigBtn, cancelConfigModalBtn, projectsList, newProjectBtn, newProjectModal, newProjectForm, cancelProjectModalBtn, currentProjectName, ideationTabs, ideationTabContents, ideationPremise, ideasList, charactersList, locationsList, objectsList, systemsList, newIdeaBtn, newIdeaModal, newIdeaForm, cancelIdeaModalBtn, newCharacterBtn, characterModal, saveCharacterBtn, cancelCharacterModalBtn, characterForm, newLocationBtn, locationModal, locationForm, saveLocationBtn, cancelLocationModalBtn, newObjectBtn, objectModal, objectForm, saveObjectBtn, cancelObjectModalBtn, newSystemBtn, systemModal, systemForm, saveSystemBtn, cancelSystemModalBtn, geminiSubmitBtn, geminiPrompt, geminiResponse, saveGeminiResponseBtn, sidebarSettingsBtn;
+let authScreen,
+  appScreen,
+  mainNav,
+  mainContentArea,
+  themeSelector,
+  showConfigBtn,
+  sidebarSettingsBtn,
+  loginForm,
+  logoutBtn,
+  userEmailEl,
+  loginSubmitBtn,
+  authErrorEl,
+  userInfoEl,
+  configStatusEl,
+  modalContainer,
+  currentProjectNameEl;
+let openAiBtn;
+let openImportBtn;
+let aiAssistantModal;
+let confirmModal;
 
-// --- CONFIGURATION ---
-async function loadAndApplyConfig() {
-    const settings = await DataManager.getSettings();
-    if (settings.geminiApiKey) {
-        GEMINI_API_KEY = settings.geminiApiKey;
+// --- RACE CONTROL / AI CONFIG CACHE ---
+let currentViewToken = 0; // Incremental token per prevenire race condition nei caricamenti vista
+let lastAIConfig = null; // Cache configurazione AI per re-init selettivo
+
+// --- UI NOTIFIER ---
+const uiNotifier = {
+  showStatus(
+    message,
+    { isLoading = false, isError = false, autoClose = 0 } = {}
+  ) {
+    if (!syncModal) return;
+    syncModal.show({
+      title: isError ? 'Errore' : 'Stato Sincronizzazione',
+      message,
+      isLoading,
+      secondaryBtnText: 'Chiudi',
+    });
+    if (autoClose > 0) {
+      setTimeout(() => syncModal.hide(), autoClose);
     }
-    const savedTheme = settings.theme || 'scifi';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    if(themeSelector) themeSelector.value = savedTheme;
-}
+  },
+  showConflict(status, diff) {
+    if (!syncModal) return;
+    let title, message, primaryBtnText, onPrimary;
 
-async function openConfigModal() {
-    const settings = await DataManager.getSettings();
-    document.getElementById('config-geminiApiKey').value = settings.geminiApiKey || '';
-    document.getElementById('firebase-config-container').style.display = 'none';
-    configModal.classList.remove('hidden');
-}
-
-// --- RENDERING ---
-async function renderProjects() {
-    const projects = await DataManager.getProjects();
-    projectsList.innerHTML = projects.length === 0 ? `<p class="text-secondary col-span-full">Nessun progetto. Creane uno!</p>` : '';
-    projects.forEach(project => {
-        const card = document.createElement('div');
-        card.className = 'bg-secondary p-6 rounded-xl border border-accent/20 hover:border-accent transition cursor-pointer';
-        card.innerHTML = `<h3 class="text-xl font-bold font-display">${project.title}</h3><p class="text-secondary text-sm mt-2 h-10 overflow-hidden">${project.premise || 'Nessuna premessa.'}</p>`;
-        card.addEventListener('click', () => selectProject(project.id));
-        projectsList.appendChild(card);
-    });
-}
-
-async function renderProjectItems(projectId, itemType, listElement) {
-    const items = await DataManager.getProjectItems(projectId, itemType);
-    listElement.innerHTML = items.length === 0 ? `<p class="text-secondary p-4 text-center">Nessun elemento creato.</p>` : '';
-    
-    items.forEach(item => {
-        let card;
-        switch (itemType) {
-            case 'ideas':
-                card = document.createElement('div');
-                card.className = 'bg-primary p-3 rounded-lg text-sm text-secondary';
-                card.textContent = item.content;
-                break;
-            case 'characters':
-                card = document.createElement('div');
-                card.className = 'bg-primary p-4 rounded-lg flex items-center justify-between';
-                card.innerHTML = `<div><p class="font-bold">${item.name}</p><p class="text-xs text-secondary">${(item.context || '').substring(0, 50)}...</p></div><button class="edit-item-btn p-1 hover:accent" data-item-id="${item.id}" data-item-type="characters"><i data-lucide="edit" class="h-4 w-4"></i></button>`;
-                break;
-            case 'locations':
-                 card = document.createElement('div');
-                 card.className = 'bg-primary p-4 rounded-lg';
-                 card.innerHTML = `<div class="flex justify-between items-center"><div><p class="font-bold">${item.name}</p><p class="text-xs text-secondary mt-1">${(item.description || '').substring(0, 80)}...</p></div><button class="edit-item-btn p-1 hover:accent" data-item-id="${item.id}" data-item-type="locations"><i data-lucide="edit" class="h-4 w-4"></i></button></div>`;
-                break;
-            case 'objects':
-                 card = document.createElement('div');
-                 card.className = 'bg-primary p-4 rounded-lg';
-                 card.innerHTML = `<div class="flex justify-between items-center"><div><p class="font-bold">${item.name}</p><p class="text-xs text-secondary mt-1">${(item.importance || '').substring(0, 80)}...</p></div><button class="edit-item-btn p-1 hover:accent" data-item-id="${item.id}" data-item-type="objects"><i data-lucide="edit" class="h-4 w-4"></i></button></div>`;
-                break;
-            case 'systems':
-                 card = document.createElement('div');
-                 card.className = 'bg-primary p-4 rounded-lg';
-                 card.innerHTML = `<div class="flex justify-between items-center"><div><p class="font-bold">${item.name}</p><p class="text-xs text-secondary mt-1">${(item.rules || '').substring(0, 80)}...</p></div><button class="edit-item-btn p-1 hover:accent" data-item-id="${item.id}" data-item-type="systems"><i data-lucide="edit" class="h-4 w-4"></i></button></div>`;
-                break;
-        }
-        if(card) listElement.appendChild(card);
-    });
-    lucide.createIcons();
-}
-
-// --- APP LOGIC ---
-async function selectProject(projectId) {
-    await DataManager.setCurrentProjectId(projectId);
-    const project = await DataManager.getProject(projectId);
-    if (project) {
-        currentProjectName.textContent = project.title;
-        ideationPremise.textContent = project.premise || "Nessuna premessa definita per questo progetto.";
-        switchView('ideation');
-        await loadProjectData(projectId);
+    switch (status) {
+      case 'LOCAL_NEWER':
+        title = 'Modifiche Locali Rilevate';
+        message = `Hai ${diff.local.length} modifiche non sincronizzate. Vuoi caricarle ora?`;
+        primaryBtnText = 'Carica Modifiche';
+        onPrimary = () => DataManager.uploadLocalData();
+        break;
+      case 'REMOTE_NEWER':
+        title = 'Dati Remoti Più Recenti';
+        message = `Ci sono ${diff.remote.length} aggiornamenti sul server. Vuoi scaricarli ora? (Le modifiche locali non sincronizzate verranno perse)`;
+        primaryBtnText = 'Scarica Dati';
+        onPrimary = () => DataManager.downloadRemoteData();
+        break;
+      case 'DIVERGED':
+        title = 'Dati Divergenti';
+        message = `Hai ${diff.local.length} modifiche locali e ${diff.remote.length} modifiche remote. Scegli quale versione mantenere.`;
+        primaryBtnText = 'Mantieni Dati Remoti';
+        onPrimary = () => DataManager.downloadRemoteData();
+        break;
     }
-}
 
-async function loadProjectData(projectId) {
-    await Promise.all([
-        renderProjectItems(projectId, 'ideas', ideasList),
-        renderProjectItems(projectId, 'characters', charactersList),
-        renderProjectItems(projectId, 'locations', locationsList),
-        renderProjectItems(projectId, 'objects', objectsList),
-        renderProjectItems(projectId, 'systems', systemsList)
-    ]);
-}
-
-async function saveAndCloseForm(formType, modalElement, formElement) {
-    const projectId = await DataManager.getCurrentProjectId();
-    if (!projectId) return;
-
-    const formData = new FormData(formElement);
-    const itemData = Object.fromEntries(formData.entries());
-    
-    await DataManager.saveProjectItem(projectId, formType, itemData);
-    
-    modalElement.classList.add('hidden');
-    formElement.reset();
-    
-    const listElement = document.getElementById(`${formType}-list`);
-    if(listElement) await renderProjectItems(projectId, formType, listElement);
-}
-
-async function openEditModal(itemId, itemType) {
-    const projectId = await DataManager.getCurrentProjectId();
-    const items = await DataManager.getProjectItems(projectId, itemType);
-    const itemData = items.find(item => item.id === itemId);
-    if (!itemData) return;
-
-    const modal = document.getElementById(`${itemType.slice(0, -1)}-modal`);
-    const form = document.getElementById(`${itemType.slice(0, -1)}-form`);
-
-    if (!modal || !form) return;
-
-    for (const key in itemData) {
-        const input = form.querySelector(`[name="${key}"]`);
-        if (input) {
-            input.value = itemData[key];
-        }
-    }
-    modal.classList.remove('hidden');
-}
-
-
-// --- EVENT LISTENERS ---
-function setupEventListeners() {
-    mainNav.addEventListener('click', (e) => {
-        const navItem = e.target.closest('.nav-item');
-        if (navItem && navItem.dataset.view) switchView(navItem.dataset.view);
+    syncModal.show({
+      title,
+      message,
+      primaryBtnText,
+      onPrimary,
+      secondaryBtnText: 'Decidi più tardi',
     });
-
-    themeSelector.addEventListener('change', async (e) => {
-        const newTheme = e.target.value;
-        document.documentElement.setAttribute('data-theme', newTheme);
-        await DataManager.saveSettings({ theme: newTheme });
-    });
-
-    showConfigBtn.addEventListener('click', openConfigModal);
-    sidebarSettingsBtn.addEventListener('click', openConfigModal);
-    cancelConfigModalBtn.addEventListener('click', () => configModal.classList.add('hidden'));
-    saveConfigBtn.addEventListener('click', async () => {
-        const geminiKey = document.getElementById('config-geminiApiKey').value;
-        await DataManager.saveSettings({ geminiApiKey: geminiKey });
-        GEMINI_API_KEY = geminiKey;
-        configModal.classList.add('hidden');
-    });
-
-    newProjectBtn.addEventListener('click', () => newProjectModal.classList.remove('hidden'));
-    cancelProjectModalBtn.addEventListener('click', () => newProjectModal.classList.add('hidden'));
-    newProjectForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const title = document.getElementById('new-project-title').value;
-        const premise = document.getElementById('new-project-premise').value;
-        if (!title) return;
-        await DataManager.saveProject({ title, premise });
-        newProjectForm.reset();
-        newProjectModal.classList.add('hidden');
-        await renderProjects();
-    });
-
-    appScreen.addEventListener('click', (e) => {
-        const editButton = e.target.closest('.edit-item-btn');
-        if (editButton) {
-            const { itemId, itemType } = editButton.dataset;
-            if (itemId && itemType) {
-                openEditModal(itemId, itemType);
-            }
-        }
-    });
-
-    ideationTabs.addEventListener('click', (e) => {
-        const tabButton = e.target.closest('.ideation-tab-btn');
-        if (tabButton) switchIdeationTab(tabButton.dataset.tab);
-    });
-
-    newIdeaBtn.addEventListener('click', () => newIdeaModal.classList.remove('hidden'));
-    cancelIdeaModalBtn.addEventListener('click', () => newIdeaModal.classList.add('hidden'));
-    newIdeaForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const projectId = await DataManager.getCurrentProjectId();
-        const content = document.getElementById('new-idea-content').value;
-        if (!projectId || !content) return;
-        await DataManager.saveProjectItem(projectId, 'ideas', { content });
-        newIdeaForm.reset();
-        newIdeaModal.classList.add('hidden');
-        await renderProjectItems(projectId, 'ideas', ideasList);
-    });
-
-    newCharacterBtn.addEventListener('click', () => {
-        characterForm.reset();
-        characterForm.querySelector('[name="id"]').value = '';
-        characterModal.classList.remove('hidden');
-    });
-    cancelCharacterModalBtn.addEventListener('click', () => characterModal.classList.add('hidden'));
-    saveCharacterBtn.addEventListener('click', () => saveAndCloseForm('characters', characterModal, characterForm));
-
-    newLocationBtn.addEventListener('click', () => {
-        locationForm.reset();
-        locationForm.querySelector('[name="id"]').value = '';
-        locationModal.classList.remove('hidden');
-    });
-    cancelLocationModalBtn.addEventListener('click', () => locationModal.classList.add('hidden'));
-    saveLocationBtn.addEventListener('click', () => saveAndCloseForm('locations', locationModal, locationForm));
-    
-    newObjectBtn.addEventListener('click', () => {
-        objectForm.reset();
-        objectForm.querySelector('[name="id"]').value = '';
-        objectModal.classList.remove('hidden');
-    });
-    cancelObjectModalBtn.addEventListener('click', () => objectModal.classList.add('hidden'));
-    saveObjectBtn.addEventListener('click', () => saveAndCloseForm('objects', objectModal, objectForm));
-
-    newSystemBtn.addEventListener('click', () => {
-        systemForm.reset();
-        systemForm.querySelector('[name="id"]').value = '';
-        systemModal.classList.remove('hidden');
-    });
-    cancelSystemModalBtn.addEventListener('click', () => systemModal.classList.add('hidden'));
-    saveSystemBtn.addEventListener('click', () => saveAndCloseForm('systems', systemModal, systemForm));
-}
-
-// --- UI UTILITIES ---
-function switchView(viewName) {
-    document.querySelectorAll('#main-nav .nav-item').forEach(item => {
-        const isTarget = item.dataset.view === viewName;
-        item.classList.toggle('bg-primary', isTarget);
-        const icon = item.querySelector('i') || item.querySelector('svg');
-        if (icon) {
-            icon.classList.toggle('accent', isTarget);
-            icon.classList.toggle('text-secondary', !isTarget);
-        }
-    });
-    contentPanels.forEach(panel => {
-        panel.id === `view-${viewName}` ? panel.classList.remove('hidden') : panel.classList.add('hidden');
-    });
-}
-
-function switchIdeationTab(tabName) {
-    document.querySelectorAll('.ideation-tab-btn').forEach(btn => {
-        const isTarget = btn.dataset.tab === tabName;
-        btn.classList.toggle('accent', isTarget);
-        btn.classList.toggle('border-accent', isTarget);
-        btn.classList.toggle('text-secondary', !isTarget);
-        btn.classList.toggle('border-transparent', !isTarget);
-    });
-    document.querySelectorAll('.ideation-tab-content').forEach(content => {
-        content.id === `${tabName}-content` ? content.classList.remove('hidden') : content.classList.add('hidden');
-    });
-}
+  },
+  closeStatus() {
+    if (syncModal) syncModal.hide();
+  },
+};
 
 // --- INITIALIZATION ---
-async function startApp() {
-    // Assegnazione variabili DOM
-    authScreen = document.getElementById('auth-screen');
-    appScreen = document.getElementById('app-screen');
-    mainNav = document.getElementById('main-nav');
-    contentPanels = document.querySelectorAll('.view-content');
-    themeSelector = document.getElementById('theme-selector');
-    showConfigBtn = document.getElementById('show-config-btn');
-    configModal = document.getElementById('config-modal');
-    configForm = document.getElementById('config-form');
-    saveConfigBtn = document.getElementById('save-config-btn');
-    cancelConfigModalBtn = document.getElementById('cancel-config-modal');
-    projectsList = document.getElementById('projects-list');
-    newProjectBtn = document.getElementById('new-project-btn');
-    newProjectModal = document.getElementById('new-project-modal');
-    newProjectForm = document.getElementById('new-project-form');
-    cancelProjectModalBtn = document.getElementById('cancel-project-modal');
-    currentProjectName = document.getElementById('current-project-name');
-    ideationTabs = document.getElementById('ideation-tabs');
-    ideationTabContents = document.querySelectorAll('.ideation-tab-content');
-    ideationPremise = document.getElementById('ideation-premise');
-    ideasList = document.getElementById('ideas-list');
-    charactersList = document.getElementById('characters-list');
-    locationsList = document.getElementById('locations-list');
-    objectsList = document.getElementById('objects-list');
-    systemsList = document.getElementById('systems-list');
-    newIdeaBtn = document.getElementById('new-idea-btn');
-    newIdeaModal = document.getElementById('new-idea-modal');
-    newIdeaForm = document.getElementById('new-idea-form');
-    cancelIdeaModalBtn = document.getElementById('cancel-idea-modal');
-    newCharacterBtn = document.getElementById('new-character-btn');
-    characterModal = document.getElementById('character-modal');
-    saveCharacterBtn = document.getElementById('save-character-btn');
-    cancelCharacterModalBtn = document.getElementById('cancel-character-modal');
-    characterForm = document.getElementById('character-form');
-    newLocationBtn = document.getElementById('new-location-btn');
-    locationModal = document.getElementById('location-modal');
-    locationForm = document.getElementById('location-form');
-    saveLocationBtn = document.getElementById('save-location-btn');
-    cancelLocationModalBtn = document.getElementById('cancel-location-modal');
-    newObjectBtn = document.getElementById('new-object-btn');
-    objectModal = document.getElementById('object-modal');
-    objectForm = document.getElementById('object-form');
-    saveObjectBtn = document.getElementById('save-object-btn');
-    cancelObjectModalBtn = document.getElementById('cancel-object-modal');
-    newSystemBtn = document.getElementById('new-system-btn');
-    systemModal = document.getElementById('system-modal');
-    systemForm = document.getElementById('system-form');
-    saveSystemBtn = document.getElementById('save-system-btn');
-    cancelSystemModalBtn = document.getElementById('cancel-system-modal');
-    geminiSubmitBtn = document.getElementById('gemini-submit');
-    geminiPrompt = document.getElementById('gemini-prompt');
-    geminiResponse = document.getElementById('gemini-response');
-    saveGeminiResponseBtn = document.getElementById('save-gemini-response-btn');
-    sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
+document.addEventListener('DOMContentLoaded', initializeApp);
 
-    authScreen.classList.add('hidden');
-    appScreen.classList.remove('hidden');
-    document.getElementById('user-info').style.display = 'none';
+async function initializeApp() {
+  // Assign DOM variables
+  authScreen = document.getElementById('auth-screen');
+  appScreen = document.getElementById('app-screen');
+  mainNav = document.getElementById('main-nav');
+  mainContentArea = document.getElementById('main-content-area');
+  themeSelector = document.getElementById('theme-selector');
+  showConfigBtn = document.getElementById('show-config-btn');
+  sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
+  openAiBtn = document.getElementById('open-ai-assistant');
+  openImportBtn = document.getElementById('open-import-text');
+  loginForm = document.getElementById('login-form');
+  logoutBtn = document.getElementById('logout-btn');
+  userEmailEl = document.getElementById('user-email');
+  loginSubmitBtn = document.getElementById('login-submit-btn');
+  authErrorEl = document.getElementById('auth-error');
+  userInfoEl = document.getElementById('user-info');
+  configStatusEl = document.getElementById('config-status');
+  modalContainer = document.getElementById('modal-container');
+  currentProjectNameEl = document.getElementById('current-project-name');
 
-    setupEventListeners();
-    await loadAndApplyConfig();
-    
-    const currentProjectId = await DataManager.getCurrentProjectId();
-    if (currentProjectId) {
-        await selectProject(currentProjectId);
-    } else {
-        switchView('dashboard');
+  await ThemeManager.init(themeSelector);
+  const settings = await DataManager.getSettings();
+
+  // Pre-load modals
+  configModal = await loadModal('config');
+  syncModal = await loadModal('sync');
+  confirmModal = await loadModal('confirm');
+  aiAssistantModal = await loadModal('ai-assistant');
+  importTextModal = await loadModal('import-text');
+
+  setupEventListeners();
+  DataManager.init(FirebaseSync, uiNotifier);
+  // Esponi un helper globale per conferme custom
+  window.appConfirm = async (message, opts = {}) => {
+    try {
+      const m = confirmModal || (await loadModal('confirm'));
+      if (!m || !m.confirm) return window.confirm(message);
+      return await m.confirm(message, opts);
+    } catch {
+      return window.confirm(message);
     }
-    
-    await renderProjects();
-    lucide.createIcons();
+  };
+
+  // Set initial UI states
+  await updateActiveProjectIndicator();
+
+  // Init AI with settings (cache per confronti futuri)
+  const initialAI = {
+    provider: settings.aiProvider || 'openai-compatible',
+    baseUrl: settings.aiBaseUrl || '',
+    // Backward-compat: prefer aiApiKey, fallback to legacy geminiApiKey
+    apiKey: settings.aiApiKey || settings.geminiApiKey || '',
+    model: settings.aiModel || '',
+    headers: settings.aiHeaders || {},
+  };
+  AIService.init(initialAI);
+  lastAIConfig = { ...initialAI };
+
+  if (settings.firebaseConfig && settings.firebaseConfig.apiKey) {
+    const initResult = await FirebaseSync.initFirebase(settings.firebaseConfig);
+    if (initResult.success) {
+      configStatusEl.textContent = 'Firebase Configurato.';
+      configStatusEl.className =
+        'text-center text-xs p-2 rounded-lg bg-green-500/20 text-green-300';
+      setupAuthObserver();
+    } else {
+      configStatusEl.textContent = `Errore Firebase: ${initResult.error}`;
+      configStatusEl.className =
+        'text-center text-xs p-2 rounded-lg bg-red-500/20 text-red-300';
+      launchOfflineMode();
+    }
+  } else {
+    configStatusEl.textContent = 'Firebase non configurato.';
+    configStatusEl.className =
+      'text-center text-xs p-2 rounded-lg bg-yellow-500/20 text-yellow-300';
+    launchOfflineMode();
+  }
 }
 
-document.addEventListener('DOMContentLoaded', startApp);
+async function updateActiveProjectIndicator() {
+  if (!currentProjectNameEl) return;
+  const projectId = await DataManager.getCurrentProjectId();
+  if (projectId) {
+    const project = await DataManager.getProject(projectId);
+    currentProjectNameEl.textContent = project ? project.title : 'Nessuno';
+  } else {
+    currentProjectNameEl.textContent = 'Nessuno';
+  }
+}
+
+function launchOfflineMode() {
+  isOfflineMode = true;
+  console.log('Avvio in modalità offline.');
+  authScreen.classList.add('hidden');
+  appScreen.classList.remove('hidden');
+  userInfoEl.innerHTML = `<p class="text-xs text-secondary">Modalità offline</p>`;
+  userInfoEl.style.display = 'flex';
+  logoutBtn.style.display = 'none';
+  switchView('dashboard');
+}
+
+function setupAuthObserver() {
+  FirebaseSync.onAuthStateChanged(async user => {
+    if (user) {
+      isOfflineMode = false;
+      authScreen.classList.add('hidden');
+      appScreen.classList.remove('hidden');
+      userEmailEl.textContent = user.email;
+      userInfoEl.style.display = 'flex';
+      logoutBtn.style.display = 'block';
+
+      const settings = await DataManager.getSettings();
+      ThemeManager.applyTheme(settings.theme || 'scifi');
+
+      try {
+        await DataManager.sync();
+      } catch (error) {
+        console.error('Sync failed on startup:', error);
+        uiNotifier.showStatus(
+          'Sincronizzazione iniziale fallita. Controlla la console.',
+          { isError: true, autoClose: 5000 }
+        );
+      }
+
+      switchView('dashboard');
+    } else {
+      authScreen.classList.remove('hidden');
+      appScreen.classList.add('hidden');
+    }
+  });
+}
+
+function setupEventListeners() {
+  mainNav.addEventListener('click', e => {
+    const navItem = e.target.closest('.nav-item');
+    if (navItem && navItem.dataset.view) switchView(navItem.dataset.view);
+  });
+
+  showConfigBtn.addEventListener('click', () => configModal?.open());
+  // Shortcut per aprire l'assistente IA
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      aiAssistantModal?.open?.();
+    }
+  });
+  sidebarSettingsBtn.addEventListener('click', () => configModal?.open());
+  openAiBtn?.addEventListener('click', () => aiAssistantModal?.open?.());
+  openImportBtn?.addEventListener('click', () => importTextModal?.open?.());
+
+  loginForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (isOfflineMode) return;
+    loginSubmitBtn.disabled = true;
+    authErrorEl.textContent = '';
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const result = await FirebaseSync.login(email, password);
+    if (!result.success) {
+      authErrorEl.textContent = 'Credenziali errate.';
+      loginSubmitBtn.disabled = false;
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    if (isOfflineMode) return;
+    await FirebaseSync.logout();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (!isOfflineMode) {
+      DataManager.syncOnClose();
+    }
+  });
+
+  // Listen for settings changes to update UI elements & AI re-init
+  window.addEventListener('settingschanged', onSettingsChanged);
+  // Project / data changes (aggiornano label progetto corrente)
+  window.addEventListener('projectchanged', updateActiveProjectIndicator);
+  window.addEventListener('datachanged', e => {
+    if (e.detail?.type === 'projects') updateActiveProjectIndicator();
+  });
+}
+
+async function switchView(viewName) {
+  const myToken = ++currentViewToken;
+
+  document.querySelectorAll('#main-nav .nav-item').forEach(item => {
+    const isTarget = item.dataset.view === viewName;
+    item.classList.toggle('bg-primary', isTarget);
+  });
+
+  // Placeholder di caricamento
+  mainContentArea.innerHTML = `<div class="flex items-center justify-center py-10 text-secondary text-sm"><i data-lucide="loader" class="animate-spin mr-2"></i>Caricamento ${viewName}...</div>`;
+  lucide.createIcons();
+
+  try {
+    const response = await fetch(`views/${viewName}/${viewName}.html`);
+    if (!response.ok) throw new Error(`Could not load view: ${viewName}`);
+    const html = await response.text();
+    if (myToken !== currentViewToken) return; // Race abort
+    mainContentArea.innerHTML = html;
+
+    const module = await import(`./views/${viewName}/${viewName}.js`);
+    if (myToken !== currentViewToken) return; // Race abort
+    if (module.default && typeof module.default.init === 'function') {
+      module.default.init(
+        DataManager,
+        isOfflineMode ? null : FirebaseSync,
+        loadModal,
+        switchView
+      );
+    }
+    lucide.createIcons();
+  } catch (error) {
+    if (myToken !== currentViewToken) return; // Evita override di errore da view successiva
+    console.error('Error loading view:', error);
+    mainContentArea.innerHTML = `<p class=\"text-red-500 p-4\">Error loading view: ${viewName}. ${error.message}</p>`;
+  }
+}
+
+// Gestione cambi settings (AI re-init on demand)
+async function onSettingsChanged() {
+  updateActiveProjectIndicator();
+  try {
+    const s = await DataManager.getSettings();
+    const next = {
+      provider: s.aiProvider || 'openai-compatible',
+      baseUrl: s.aiBaseUrl || '',
+      // Backward-compat: prefer aiApiKey, fallback to legacy geminiApiKey
+      apiKey: s.aiApiKey || s.geminiApiKey || '',
+      model: s.aiModel || '',
+      headers: s.aiHeaders || {},
+    };
+    if (
+      !lastAIConfig ||
+      lastAIConfig.provider !== next.provider ||
+      lastAIConfig.baseUrl !== next.baseUrl ||
+      lastAIConfig.apiKey !== next.apiKey ||
+      lastAIConfig.model !== next.model
+    ) {
+      AIService.init(next);
+      lastAIConfig = { ...next };
+      console.info('[AI] Re-inizializzata per modifica configurazione.');
+    }
+  } catch (err) {
+    console.warn('[AI] Aggiornamento configurazione fallito:', err);
+  }
+}
+
+async function loadModal(modalName) {
+  const modalId = `${modalName}-modal`;
+  let module;
+
+  // Prova a vedere se il modulo è già stato caricato in qualche modo (es. in un registro)
+  // Per ora, ci basiamo sulla presenza dell'elemento nel DOM e assumiamo che il modulo sia caricato
+  if (document.getElementById(modalId)) {
+    try {
+      module = await import(`./views/modals/${modalName}.js`);
+      return module.default;
+    } catch (e) {
+      console.error(`Failed to re-import modal module: ${modalName}`, e);
+      return null;
+    }
+  }
+
+  try {
+    const response = await fetch(`views/modals/${modalName}.html`);
+    if (!response.ok)
+      throw new Error(`Could not load modal HTML: ${modalName}`);
+
+    const frag = document.createDocumentFragment();
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = await response.text();
+    frag.appendChild(wrapper.firstElementChild);
+    modalContainer.appendChild(frag);
+
+    module = await import(`./views/modals/${modalName}.js`);
+    if (module.default && typeof module.default.init === 'function') {
+      try {
+        module.default.init(DataManager, loadModal, switchView);
+      } catch {
+        module.default.init();
+      }
+      return module.default;
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error loading modal: ${modalName}`, error);
+    return null;
+  }
+}

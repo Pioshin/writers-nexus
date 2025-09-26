@@ -1,0 +1,265 @@
+<div id="view-structure" class="view-content p-8">
+  <div class="border-b border-accent/20 mb-6 pb-4">
+    <div
+      class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+    >
+      <div>
+        <h2 class="text-4xl font-display">Struttura della Trama</h2>
+        <p class="text-lg text-secondary">
+          Organizza la tua storia seguendo le tappe del Viaggio dell'Eroe.
+        </p>
+      </div>
+      <div class="flex gap-3">
+        <button
+          id="global-expand-all"
+          class="px-3 py-1 text-sm bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Espandi tutte
+        </button>
+        <button
+          id="global-collapse-all"
+          class="px-3 py-1 text-sm bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Contrai tutte
+        </button>
+        <button
+          id="open-hero-suggestions"
+          class="px-3 py-1 text-sm bg-accent text-primary rounded border border-accent/40 hover:bg-opacity-90"
+          title="Suggerimenti AI tappe Viaggio dell'Eroe"
+        >
+          Suggerimenti AI
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="structure-container"
+    class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+  >
+    <!-- Sezione Scene Non Assegnate -->
+    <div
+      id="unassigned"
+      class="lg:col-span-3 bg-secondary p-4 rounded-lg border border-dashed border-accent/40"
+    >
+      <div class="flex flex-col gap-3">
+        <div class="flex justify-between items-center">
+          <h3 class="text-2xl font-display text-accent">SCENE NON ASSEGNATE</h3>
+          <div class="flex gap-2 items-center">
+            <button
+              id="unassigned-refresh"
+              class="px-2 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+            >
+              Aggiorna
+            </button>
+            <button
+              id="unassigned-add"
+              class="px-2 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+            >
+              Nuova scena
+            </button>
+          </div>
+        </div>
+        <div
+          class="flex flex-wrap gap-3 items-end bg-secondary p-3 rounded border border-accent/20"
+        >
+          <div class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="unassigned-select-all"
+              class="accent-accent"
+            />
+            <label for="unassigned-select-all" class="text-xs"
+              >Seleziona tutte</label
+            >
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs">Assegna a:</label>
+            <select
+              id="unassigned-batch-target"
+              class="text-xs bg-primary/70 border border-accent/30 rounded px-2 py-1"
+            >
+              <option value="">-- scegli stadio --</option>
+              <option value="ordinary_world">Mondo Ordinario</option>
+              <option value="call_to_adventure">Chiamata</option>
+              <option value="refusal_of_call">Rifiuto</option>
+              <option value="meeting_mentor">Mentore</option>
+              <option value="crossing_threshold">Soglia</option>
+              <option value="tests_allies_enemies">Prove/Alleati/Nemici</option>
+              <option value="inmost_cave">Avvicinamento</option>
+              <option value="ordeal">Prova Centrale</option>
+              <option value="reward">Ricompensa</option>
+              <option value="road_back">Via del Ritorno</option>
+              <option value="resurrection">Resurrezione</option>
+              <option value="return_with_elixir">Ritorno</option>
+            </select>
+            <button
+              id="unassigned-batch-apply"
+              class="px-2 py-1 text-xs bg-accent text-primary rounded border border-accent/30 hover:bg-opacity-90 disabled:opacity-40"
+              disabled
+            >
+              Applica
+            </button>
+          </div>
+          <div class="flex items-center gap-2 ml-auto">
+            <span
+              id="unassigned-selected-counter"
+              class="text-[11px] text-secondary"
+              >0 selezionate</span
+            >
+          </div>
+        </div>
+        <p class="text-sm text-secondary -mt-1">
+          Le scene importate senza stadio vengono elencate qui. Trascinale
+          oppure usa il batch tagging per assegnarle.
+        </p>
+        <div
+          id="unassigned-scenes"
+          class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 min-h-[4rem] border border-border-color/40 rounded p-2 bg-secondary"
+          data-drop-stage="unassigned"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Atto 1 -->
+    <div
+      id="act-1"
+      class="bg-secondary p-4 rounded-lg border border-border-color"
+    >
+      <h3 class="text-2xl font-display accent text-center mb-4">
+        Atto I: Partenza
+      </h3>
+      <div class="flex justify-center gap-3 mb-4">
+        <button
+          id="act-1-expand-all"
+          class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Espandi tutto
+        </button>
+        <button
+          id="act-1-collapse-all"
+          class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Contrai tutto
+        </button>
+      </div>
+      <div id="act-1-stages" class="space-y-4"></div>
+    </div>
+
+    <!-- Atto 2 -->
+    <div
+      id="act-2"
+      class="bg-secondary p-4 rounded-lg border border-border-color"
+    >
+      <h3 class="text-2xl font-display accent text-center mb-4">
+        Atto II: Iniziazione
+      </h3>
+      <div class="flex justify-center gap-3 mb-4">
+        <button
+          id="act-2-expand-all"
+          class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Espandi tutto
+        </button>
+        <button
+          id="act-2-collapse-all"
+          class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Contrai tutto
+        </button>
+      </div>
+      <div id="act-2-stages" class="space-y-4"></div>
+    </div>
+
+    <!-- Atto 3 -->
+    <div
+      id="act-3"
+      class="bg-secondary p-4 rounded-lg border border-border-color"
+    >
+      <h3 class="text-2xl font-display accent text-center mb-4">
+        Atto III: Ritorno
+      </h3>
+      <div class="flex justify-center gap-3 mb-4">
+        <button
+          id="act-3-expand-all"
+          class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Espandi tutto
+        </button>
+        <button
+          id="act-3-collapse-all"
+          class="px-3 py-1 text-xs bg-primary rounded border border-accent/30 hover:bg-opacity-80"
+        >
+          Contrai tutto
+        </button>
+      </div>
+      <div id="act-3-stages" class="space-y-4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Template per una Tappa (Stage) -->
+<template id="stage-template">
+  <div
+    class="stage-container bg-secondary p-4 rounded-md border border-border-color/50"
+  >
+    <div class="flex justify-between items-center">
+      <h4 class="text-lg font-bold text-text-primary stage-title"></h4>
+      <div class="flex items-center gap-2">
+        <button class="toggle-scenes-btn p-1 hover:text-accent">
+          <i data-lucide="chevrons-up-down" class="w-4 h-4"></i>
+        </button>
+        <button class="add-scene-btn p-1 hover:text-accent">
+          <i data-lucide="plus" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+    <div class="scenes-list mt-3 space-y-2 hidden"></div>
+  </div>
+</template>
+
+<!-- Template per una Scena -->
+<template id="scene-card-template">
+  <div
+    class="scene-card bg-secondary p-3 rounded shadow-md cursor-pointer relative group space-y-2"
+    draggable="true"
+  >
+    <div class="flex justify-between gap-2 items-start">
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold scene-title truncate"></p>
+        <p
+          class="text-xs text-text-secondary scene-synopsis mt-1 line-clamp-3"
+        ></p>
+      </div>
+      <div class="w-40 shrink-0">
+        <select
+          class="scene-stage-select w-full text-xs bg-primary border border-accent/30 rounded px-1 py-1 focus:outline-none"
+        >
+          <option value="unassigned">(Non assegnata)</option>
+          <option value="ordinary_world">Mondo Ordinario</option>
+          <option value="call_to_adventure">Chiamata</option>
+          <option value="refusal_of_call">Rifiuto</option>
+          <option value="meeting_mentor">Mentore</option>
+          <option value="crossing_threshold">Soglia</option>
+          <option value="tests_allies_enemies">Prove/Alleati/Nemici</option>
+          <option value="inmost_cave">Avvicinamento</option>
+          <option value="ordeal">Prova Centrale</option>
+          <option value="reward">Ricompensa</option>
+          <option value="road_back">Via del Ritorno</option>
+          <option value="resurrection">Resurrezione</option>
+          <option value="return_with_elixir">Ritorno</option>
+        </select>
+      </div>
+    </div>
+    <div
+      class="flex justify-end opacity-0 group-hover:opacity-100 transition pointer-events-none group-hover:pointer-events-auto gap-2"
+    >
+      <button
+        class="text-[10px] px-2 py-1 rounded bg-primary/60 border border-accent/30 hover:bg-primary"
+        data-edit-scene
+      >
+        Apri
+      </button>
+    </div>
+  </div>
+</template>

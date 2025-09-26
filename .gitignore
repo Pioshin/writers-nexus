@@ -1,0 +1,33 @@
+# Dipendenze
+node_modules/
+
+# Build/coverage
+/dist/
+/build/
+/coverage/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# VS Code
+.vscode/
+
+# Prototipi (non fanno parte del progetto)
+/PROTOTIPI ED ESEMPI non fanno parte del progetto/
+
+# Env locali
+.env
+
+# Cache
+*.cache
+
+# Report locali
+lint-report.txt

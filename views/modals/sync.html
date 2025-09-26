@@ -1,0 +1,43 @@
+<div
+  id="sync-modal"
+  class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 hidden"
+>
+  <div
+    class="bg-secondary rounded-lg shadow-xl w-full max-w-md p-6 border border-accent/30"
+  >
+    <div class="flex justify-between items-center mb-4">
+      <h3 id="sync-modal-title" class="text-xl font-bold text-primary">
+        Sincronizzazione
+      </h3>
+      <button id="sync-modal-close-btn" class="text-secondary hover:accent">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+    <div id="sync-modal-body">
+      <p id="sync-modal-message" class="text-secondary mb-6">
+        Messaggio di stato o conflitto.
+      </p>
+
+      <!-- Contenitore per lo stato di caricamento -->
+      <div
+        id="sync-loading-indicator"
+        class="hidden items-center justify-center flex-col"
+      >
+        <div
+          class="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin"
+        ></div>
+        <p class="mt-4 text-secondary">In corso...</p>
+      </div>
+
+      <!-- Contenitore per i bottoni di scelta -->
+      <div id="sync-modal-actions" class="flex justify-end gap-4">
+        <button id="sync-action-secondary-btn" class="btn btn-secondary">
+          Annulla
+        </button>
+        <button id="sync-action-primary-btn" class="btn btn-primary">
+          Azione
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
