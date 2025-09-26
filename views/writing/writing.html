@@ -31,7 +31,7 @@
 
     <div class="flex-1 flex min-h-0 gap-4">
         <!-- Navigator Scene (ordine Struttura) -->
-        <aside class="w-72 hidden lg:block bg-secondary/40 border border-accent/10 rounded-lg p-3 overflow-y-auto">
+    <aside class="w-72 hidden lg:block bg-secondary border border-accent/10 rounded-lg p-3 overflow-y-auto">
             <h3 class="text-sm font-semibold text-secondary mb-2">Scene (ordine Struttura)</h3>
             <ul id="scenes-nav" class="space-y-1 text-sm"></ul>
         </aside>
@@ -39,9 +39,9 @@
         <!-- Editor a blocchi -->
         <section class="flex-1 flex flex-col min-w-0">
             <div id="scene-meta" class="text-secondary text-sm mb-3"></div>
-            <div id="scene-stage-inline-edit" class="hidden mb-3 bg-secondary/40 border border-accent/20 p-3 rounded flex flex-wrap gap-2 items-center">
+            <div id="scene-stage-inline-edit" class="hidden mb-3 bg-secondary border border-accent/20 p-3 rounded flex flex-wrap gap-2 items-center">
                 <label class="text-xs font-semibold">Stadio viaggio eroe:</label>
-                <select id="scene-stage-select-writing" class="text-xs bg-primary/70 border border-accent/30 rounded px-2 py-1">
+                <select id="scene-stage-select-writing" class="text-xs bg-primary border border-accent/30 rounded px-2 py-1">
                     <option value="unassigned">(Non assegnata)</option>
                     <option value="ordinary_world">Mondo Ordinario</option>
                     <option value="call_to_adventure">Chiamata</option>
@@ -60,7 +60,7 @@
                 <button id="scene-stage-cancel" class="text-xs px-2 py-1 bg-primary rounded border border-accent/30 hover:bg-opacity-80">Annulla</button>
                 <div id="scene-stage-feedback" class="text-[10px] text-secondary"></div>
             </div>
-            <div id="blocks-container" class="flex-1 overflow-y-auto space-y-3 p-2 bg-secondary/30 border border-accent/10 rounded-lg"></div>
+            <div id="blocks-container" class="flex-1 overflow-y-auto space-y-3 p-2 bg-secondary border border-accent/10 rounded-lg"></div>
             <div class="flex justify-between items-center mt-3">
                 <button id="add-block-btn" class="flex items-center px-3 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover transition"><i data-lucide="plus" class="w-4 h-4 mr-2"></i>Aggiungi Paragrafo</button>
                 <div class="text-xs text-secondary">Salvataggio automatico dopo una breve pausa di digitazione</div>
@@ -71,7 +71,7 @@
         <!-- Overlay Manoscritto full-screen senza distrazioni -->
             <div id="manuscript-overlay" class="hidden fixed inset-0 z-50 bg-primary">
                 <div class="max-w-5xl mx-auto h-full flex flex-col p-4">
-                    <header class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pb-3 border-b border-accent/20">
+                    <header class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between pb-3 border-b border-accent/20 bg-secondary rounded px-2 py-1">
                         <div class="flex items-center gap-2 text-secondary">
                             <i data-lucide="book-open" class="w-5 h-5"></i>
                             <span class="text-sm">Vista Manoscritto</span>
@@ -87,7 +87,7 @@
                             <button id="close-manuscript-btn" class="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"><i data-lucide="x" class="w-4 h-4 mr-1"></i>Chiudi</button>
                         </div>
                     </header>
-                    <main id="manuscript-content" class="flex-1 overflow-y-auto py-6"></main>
+                    <main id="manuscript-content" class="flex-1 overflow-y-auto py-6 bg-secondary rounded px-3"></main>
                 <footer class="pt-3 border-t border-accent/20 text-center text-xs text-secondary">ESC per chiudere • Salvataggio automatico attivo</footer>
             </div>
         </div>

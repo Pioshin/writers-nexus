@@ -68,6 +68,17 @@ body {
 .bg-accent { background-color: var(--accent); }
 .hover\:bg-accent-hover:hover { background-color: var(--accent-hover); }
 
+/* Opacizza le varianti tailwind-like (es: bg-secondary/40) per testi più leggibili
+   Nota: il carattere "/" va escapato nelle classi CSS con \\ */
+.bg-primary\/30, .bg-primary\/40, .bg-primary\/50, .bg-primary\/60, .bg-primary\/70,
+.bg-secondary\/30, .bg-secondary\/40, .bg-secondary\/50, .bg-secondary\/60, .bg-secondary\/70 {
+    background-color: var(--bg-secondary); /* default più scuro per i box */
+}
+/* Variante coerente che usa il primario quando richiesto esplicitamente */
+.bg-primary\/30, .bg-primary\/40, .bg-primary\/50, .bg-primary\/60, .bg-primary\/70 {
+    background-color: var(--bg-primary);
+}
+
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-secondary); }
 ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
