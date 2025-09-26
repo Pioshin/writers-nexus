@@ -1,6 +1,6 @@
 import { AIService } from '../../ai/AIService.js';
 
-let modalEl, fileInput, textArea, runBtn, closeBtn, commitBtn, logEl, statusEl;
+let modalEl, fileInput, textArea, runBtn, aiRunBtn, heroSuggestBtn, closeBtn, commitBtn, logEl, statusEl;
 let splitScenesEl, extractEntitiesEl, analyzeStyleEl, splitStrategyEl, minSceneLenEl, analysisFocusEl;
 // Preview elements
 let previewBox, previewScenes, previewIdeas, previewCharacters, previewPlotlines,
@@ -10,6 +10,12 @@ let previewBox, previewScenes, previewIdeas, previewCharacters, previewPlotlines
   previewLocationsCount, previewObjectsCount, previewGeographyCount, previewHistoryCount, previewCultureCount,
   selectAllLocationsEl, selectAllObjectsEl, selectAllGeographyEl, selectAllHistoryEl, selectAllCultureEl;
 let selectionState = { scenes: new Set(), ideas: new Set(), characters: new Set(), plotlines: new Set(), locations: new Set(), objects: new Set(), geography: new Set(), history: new Set(), culture: new Set() };
+
+// Stato ultimo parsing (senza AI) e ultima analisi AI
+let lastParsed = null; // { scenes, ideas }
+let lastAIEnrichment = null; // { entities, relations, plotlines, style }
+
+const DEBUG_IMPORT = false; // attiva log lunghezze scene
 
 function show() {
   modalEl.classList.remove('hidden');
@@ -209,26 +215,35 @@ function parseRomanzoStructuredMD(raw) {
   return { scenes, ideas };
 }
 
-async function runAnalysis(projectId, rawText) {
-  log('Avvio analisi...');
+// --- Parsing puro (no AI) ---
+function parseOnly(rawText) {
   const doSplit = splitScenesEl.checked;
-  const doExtract = extractEntitiesEl.checked;
-  const doStyle = analyzeStyleEl.checked;
   const strategy = splitStrategyEl.value;
   const minLen = parseInt(minSceneLenEl.value || '300', 10);
-  const focus = (analysisFocusEl?.value || '').trim();
-
-  // 1) Prova parsing formato romanzo_strutturato.md
   const structured = parseRomanzoStructuredMD(rawText);
   let scenes = structured?.scenes?.length ? structured.scenes : [{ title: 'Manoscritto', synopsis: '', content: rawText }];
   let ideasFromDoc = structured?.ideas || [];
   if (!structured?.scenes?.length && doSplit) {
     const chunks = naiveSplitIntoScenes(rawText, strategy, minLen);
     scenes = chunks.map((c, i) => ({ title: `Scena ${i+1}`, synopsis: '', content: c }));
-    log(`Segmentazione: trovate ${scenes.length} scene (naive).`);
+    log(`Segmentazione (solo parsing): trovate ${scenes.length} scene.`);
   } else if (structured?.scenes?.length) {
-    log(`Rilevato formato strutturato: importo ${scenes.length} scene e ${ideasFromDoc.length} idee.`);
+    log(`Formato strutturato rilevato: ${scenes.length} scene, ${ideasFromDoc.length} idee.`);
   }
+  if (DEBUG_IMPORT) scenes.forEach(s=>console.log('[IMPORT][SCENA]', s.title, s.content?.length));
+  return { scenes, ideas: ideasFromDoc };
+}
+
+// --- Analisi AI opzionale (entità & stile) ---
+async function runAIEnrichment(rawText) {
+  const doExtract = extractEntitiesEl.checked;
+  const doStyle = analyzeStyleEl.checked;
+  if (!doExtract && !doStyle) {
+    log('Analisi AI non richiesta (nessuna opzione attiva).');
+    return { entities: { characters: [], locations: [], objects: [], geography: [], history: [], culture: [] }, relations: [], plotlines: [], style: null, ideas: [] };
+  }
+  const focus = (analysisFocusEl?.value || '').trim();
+  log('Avvio analisi AI differita...');
 
   let entities = { characters: [], locations: [], objects: [], geography: [], history: [], culture: [] };
   let relations = [];
@@ -305,7 +320,7 @@ async function runAnalysis(projectId, rawText) {
     }
   }
 
-  return { scenes, entities, relations, plotlines, style, ideas: ideasFromDoc };
+  return { entities, relations, plotlines, style };
 }
 
 async function commitToProject(dataManager, projectId, result, options = { mode: 'merge' }) {
@@ -324,9 +339,10 @@ async function commitToProject(dataManager, projectId, result, options = { mode:
     existing.ideas = await dataManager.getProjectItems(projectId, 'ideas');
     existing.scenes = await dataManager.getProjectItems(projectId, 'scenes');
   }
-  // Scene
-  for (let i = 0; i < result.scenes.length; i++) {
+  // Scene (result.scenes atteso da parsing)
+  for (let i = 0; i < (result.scenes||[]).length; i++) {
     const s = result.scenes[i];
+    if (!s.stageKey || s.stageKey === 'imported') s.stageKey = 'unassigned';
     if (mode === 'merge') {
       const dup = existing.scenes.find(x => (x.title||'').toLowerCase() === (s.title||'').toLowerCase() && (x.stageKey||'') === (s.stageKey||'') && (x.order||'') === (s.order||''));
       if (dup) continue;
@@ -336,7 +352,7 @@ async function commitToProject(dataManager, projectId, result, options = { mode:
       title: s.title,
       synopsis: s.synopsis || '',
       content: s.content, // contenuto integrale
-      stageKey: s.stageKey || 'imported',
+      stageKey: s.stageKey || 'unassigned',
       order: s.order || (i + 1)
     });
   }
@@ -364,13 +380,15 @@ async function commitToProject(dataManager, projectId, result, options = { mode:
       await dataManager.saveProjectItem(projectId, type, data);
     }
   };
-  await saveItems('characters', result.entities.characters, it => ({ name: it.name, role: it.role || '', archetype: it.archetype || '', narrativeRole: it.role || '' }));
-  await saveItems('locations', result.entities.locations, it => ({ name: it.name, description: it.description || '' }));
-  await saveItems('objects', result.entities.objects, it => ({ name: it.name, description: it.description || '' }));
-  await saveItems('geography', result.entities.geography, it => ({ name: it.name, description: it.description || '' }));
-  await saveItems('history', result.entities.history, it => ({ name: it.name, description: it.description || '' }));
-  await saveItems('culture', result.entities.culture, it => ({ name: it.name, description: it.description || '' }));
-  await saveItems('plotlines', result.plotlines || [], it => ({ name: it.name || it.title || 'Linea narrativa', description: it.description || '' }));
+  if (result.entities) {
+    await saveItems('characters', result.entities.characters, it => ({ name: it.name, role: it.role || '', archetype: it.archetype || '', narrativeRole: it.role || '' }));
+    await saveItems('locations', result.entities.locations, it => ({ name: it.name, description: it.description || '' }));
+    await saveItems('objects', result.entities.objects, it => ({ name: it.name, description: it.description || '' }));
+    await saveItems('geography', result.entities.geography, it => ({ name: it.name, description: it.description || '' }));
+    await saveItems('history', result.entities.history, it => ({ name: it.name, description: it.description || '' }));
+    await saveItems('culture', result.entities.culture, it => ({ name: it.name, description: it.description || '' }));
+    await saveItems('plotlines', result.plotlines || [], it => ({ name: it.name || it.title || 'Linea narrativa', description: it.description || '' }));
+  }
 
   // Relazioni personaggi
   if (result.entities.characters?.length && result.relations?.length) {
@@ -396,6 +414,8 @@ function init(dataManager) {
   fileInput = document.getElementById('import-file');
   textArea = document.getElementById('import-text');
   runBtn = document.getElementById('import-run-btn');
+  aiRunBtn = document.getElementById('import-ai-run-btn');
+  heroSuggestBtn = document.getElementById('import-hero-suggest-btn');
   closeBtn = document.getElementById('import-close-btn');
   commitBtn = document.getElementById('import-commit-btn');
   logEl = document.getElementById('import-log');
@@ -439,7 +459,7 @@ function init(dataManager) {
   selectAllHistoryEl = document.getElementById('select-all-history');
   selectAllCultureEl = document.getElementById('select-all-culture');
 
-  let lastResult = null;
+  let lastResult = null; // compat legacy (contiene sia scenes che arricchimento se presente)
 
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
@@ -448,16 +468,22 @@ function init(dataManager) {
     log(`Caricato file: ${file?.name || 'n/d'} (${txt.length} caratteri)`);
   });
 
+  // IMPORT (solo parsing + anteprima base)
   runBtn.addEventListener('click', async () => {
     const projectId = await dataManager.getCurrentProjectId();
     if (!projectId) { statusEl.textContent = 'Seleziona un progetto prima.'; return; }
     const raw = textArea.value.trim();
     if (!raw) { statusEl.textContent = 'Inserisci o carica un testo.'; return; }
-    statusEl.textContent = 'Analisi in corso...';
+    statusEl.textContent = 'Parsing in corso...';
     commitBtn.disabled = true;
-    lastResult = await runAnalysis(projectId, raw);
-    statusEl.textContent = 'Analisi completata. Puoi importare i risultati.';
+    lastParsed = parseOnly(raw);
+    // Reset arricchimento precedente
+    lastAIEnrichment = null;
+    lastResult = { ...lastParsed, entities: { characters: [], locations: [], objects: [], geography: [], history: [], culture: [] }, relations: [], plotlines: [], style: null };
+    statusEl.textContent = 'Parsing completato. Puoi importare e (facoltativamente) analizzare dopo.';
     commitBtn.disabled = false;
+    aiRunBtn.disabled = false;
+    heroSuggestBtn.disabled = false; // potrà proporre stage dopo import effettivo
     // Render preview
     try {
       selectionState = { scenes: new Set(), ideas: new Set(), characters: new Set(), plotlines: new Set(), locations: new Set(), objects: new Set(), geography: new Set(), history: new Set(), culture: new Set() };
@@ -486,22 +512,23 @@ function init(dataManager) {
       };
   renderList(previewScenes, (lastResult.scenes||[]), 'scenes');
   renderList(previewIdeas, (lastResult.ideas||[]), 'ideas');
-  renderList(previewCharacters, (lastResult.entities?.characters||[]), 'characters');
-  renderList(previewPlotlines, (lastResult.plotlines||[]), 'plotlines');
-      renderList(previewLocations, (lastResult.entities?.locations||[]), 'locations');
-      renderList(previewObjects, (lastResult.entities?.objects||[]), 'objects');
-      renderList(previewGeography, (lastResult.entities?.geography||[]), 'geography');
-      renderList(previewHistory, (lastResult.entities?.history||[]), 'history');
-      renderList(previewCulture, (lastResult.entities?.culture||[]), 'culture');
+  // Nessuna entità finché non si esegue l'analisi AI
+  renderList(previewCharacters, [], 'characters');
+  renderList(previewPlotlines, [], 'plotlines');
+  renderList(previewLocations, [], 'locations');
+  renderList(previewObjects, [], 'objects');
+  renderList(previewGeography, [], 'geography');
+  renderList(previewHistory, [], 'history');
+  renderList(previewCulture, [], 'culture');
       previewScenesCount.textContent = lastResult.scenes?.length||0;
       previewIdeasCount.textContent = lastResult.ideas?.length||0;
-      previewCharactersCount.textContent = lastResult.entities?.characters?.length||0;
-      previewPlotlinesCount.textContent = lastResult.plotlines?.length||0;
-      previewLocationsCount.textContent = lastResult.entities?.locations?.length||0;
-      previewObjectsCount.textContent = lastResult.entities?.objects?.length||0;
-      previewGeographyCount.textContent = lastResult.entities?.geography?.length||0;
-      previewHistoryCount.textContent = lastResult.entities?.history?.length||0;
-      previewCultureCount.textContent = lastResult.entities?.culture?.length||0;
+  previewCharactersCount.textContent = 0;
+  previewPlotlinesCount.textContent = 0;
+  previewLocationsCount.textContent = 0;
+  previewObjectsCount.textContent = 0;
+  previewGeographyCount.textContent = 0;
+  previewHistoryCount.textContent = 0;
+  previewCultureCount.textContent = 0;
       previewBox.classList.remove('hidden');
 
       // Hook per-item selection
@@ -534,6 +561,7 @@ function init(dataManager) {
     } catch {}
   });
 
+  // COMMIT (importa ciò che è attualmente in lastResult – che può essere solo parsing o parsing+AI)
   commitBtn.addEventListener('click', async () => {
     const projectId = await dataManager.getCurrentProjectId();
     if (!projectId || !lastResult) return;
@@ -560,8 +588,23 @@ function init(dataManager) {
     // Modalità import
     const mode = importModeReplaceEl?.checked ? 'replace' : 'merge';
     if (mode === 'replace') {
-      log('Modalità: Sostituisci. Pulizia dati esistenti...');
-      await dataManager.clearProjectStores(projectId, ['scenes','ideas','characters','locations','objects','geography','history','culture','plotlines']);
+      // Cancella SOLO gli store per i quali l'utente ha effettivamente selezionato almeno un elemento da importare.
+      const toClear = [];
+      if (filtered.scenes.length) toClear.push('scenes');
+      if (filtered.ideas.length) toClear.push('ideas');
+      if (filtered.entities.characters.length) toClear.push('characters');
+      if (filtered.entities.locations.length) toClear.push('locations');
+      if (filtered.entities.objects.length) toClear.push('objects');
+      if (filtered.entities.geography.length) toClear.push('geography');
+      if (filtered.entities.history.length) toClear.push('history');
+      if (filtered.entities.culture.length) toClear.push('culture');
+      if (filtered.plotlines.length) toClear.push('plotlines');
+      if (toClear.length) {
+        log(`Modalità: Sostituisci. Pulizia mirata: ${toClear.join(', ')}`);
+        await dataManager.clearProjectStores(projectId, toClear);
+      } else {
+        log('Modalità: Sostituisci ma nessun tipo selezionato -> nessuna cancellazione eseguita.');
+      }
     } else {
       log('Modalità: Unisci (con deduplica).');
     }
@@ -585,11 +628,108 @@ function init(dataManager) {
     statusEl.textContent = 'Import completato.';
   });
 
+  // ANALISI AI differita (arricchisce lastResult e aggiorna anteprima)
+  aiRunBtn?.addEventListener('click', async () => {
+    const raw = textArea.value.trim();
+    if (!lastParsed || !raw) { statusEl.textContent = 'Nessun parsing iniziale.'; return; }
+    aiRunBtn.disabled = true; aiRunBtn.textContent = 'Analisi...';
+    try {
+      const enrich = await runAIEnrichment(raw);
+      lastAIEnrichment = enrich;
+      // unisci
+      lastResult = { ...lastParsed, ...enrich, ideas: lastParsed.ideas };
+      // Rirender entità
+      const renderList = (container, items, type) => { container.innerHTML = items.map((item, idx) => `<li class="text-xs flex items-start gap-2"><input type="checkbox" class="mt-0.5 item-check" data-type="${type}" data-idx="${idx}" checked><span>${item.name||item.title||'Elemento'}</span></li>`).join(''); selectionState[type] = new Set(items.map((_,i)=>i)); };
+      renderList(previewCharacters, (lastResult.entities?.characters||[]), 'characters');
+      renderList(previewPlotlines, (lastResult.plotlines||[]), 'plotlines');
+      renderList(previewLocations, (lastResult.entities?.locations||[]), 'locations');
+      renderList(previewObjects, (lastResult.entities?.objects||[]), 'objects');
+      renderList(previewGeography, (lastResult.entities?.geography||[]), 'geography');
+      renderList(previewHistory, (lastResult.entities?.history||[]), 'history');
+      renderList(previewCulture, (lastResult.entities?.culture||[]), 'culture');
+      previewCharactersCount.textContent = lastResult.entities?.characters?.length||0;
+      previewPlotlinesCount.textContent = lastResult.plotlines?.length||0;
+      previewLocationsCount.textContent = lastResult.entities?.locations?.length||0;
+      previewObjectsCount.textContent = lastResult.entities?.objects?.length||0;
+      previewGeographyCount.textContent = lastResult.entities?.geography?.length||0;
+      previewHistoryCount.textContent = lastResult.entities?.history?.length||0;
+      previewCultureCount.textContent = lastResult.entities?.culture?.length||0;
+      // Ricollega checkbox
+      previewBox.querySelectorAll('.item-check').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+          const type = e.target.getAttribute('data-type');
+          const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+          if (e.target.checked) selectionState[type].add(idx); else selectionState[type].delete(idx);
+        });
+      });
+      aiRunBtn.textContent = 'Analisi AI';
+      statusEl.textContent = 'Analisi AI completata.';
+    } catch (e) {
+      statusEl.textContent = 'Errore analisi AI.';
+      aiRunBtn.textContent = 'Analisi AI';
+    } finally {
+      aiRunBtn.disabled = false;
+    }
+  });
+
+  // SUGGERIMENTI VIAGGIO DELL'EROE (solo suggerimenti, non salva)
+  heroSuggestBtn?.addEventListener('click', async () => {
+    const projectId = await dataManager.getCurrentProjectId();
+    if (!projectId) { statusEl.textContent = 'Seleziona progetto.'; return; }
+    heroSuggestBtn.disabled = true; heroSuggestBtn.textContent = 'Suggerisco...';
+    try {
+      const scenes = await dataManager.getProjectItems(projectId, 'scenes');
+      if (!scenes.length) { statusEl.textContent = 'Nessuna scena importata.'; return; }
+      // Costruisci prompt con titoli + prime 400 battute
+      const catalogue = scenes.map(s=>({ id: s.id, title: s.title||'', excerpt: (s.content||'').slice(0,400) })).slice(0,60); // limite di sicurezza
+      const heroStages = ['ordinary_world','call_to_adventure','refusal_of_call','meeting_mentor','crossing_threshold','tests_allies_enemies','inmost_cave','ordeal','reward','road_back','resurrection','return_with_elixir'];
+      const system = 'Rispondi SOLO con JSON valido. Nessun commento o testo fuori dal JSON.';
+      const N = catalogue.length;
+      const stageHints = `ALLOWED_STAGES (usa le chiavi esatte):\n- ordinary_world: Mondo Ordinario\n- call_to_adventure: Chiamata\n- refusal_of_call: Rifiuto\n- meeting_mentor: Mentore\n- crossing_threshold: Soglia\n- tests_allies_enemies: Prove/Alleati/Nemici\n- inmost_cave: Avvicinamento\n- ordeal: Prova Centrale\n- reward: Ricompensa\n- road_back: Via del Ritorno\n- resurrection: Resurrezione\n- return_with_elixir: Ritorno con l'Elisir`;
+      const constraints = `CONSTRAINTS:\n- Restituisci un ARRAY JSON di LUNGHEZZA ESATTAMENTE ${N}.\n- Ogni elemento deve avere: {"id":"sceneId","idx":number,"suggestedStage":"<allowed>","confidence":0-1}.\n- Copia esattamente l'id fornito per la scena corrispondente e imposta idx con il numero IDX.\n- Usa solo gli stage di ALLOWED_STAGES; se incerto usa "unassigned".\n- Non inventare scene, non duplicare elementi, non saltare scene.`;
+      const sceneList = 'SCENES:\n' + catalogue.map((c,i)=>`IDX:${i+1} | ID:${c.id}\nTitolo:${c.title}\nTesto:${c.excerpt.replace(/\n/g,' ')}`).join('\n---\n');
+      const outputFormat = 'OUTPUT_FORMAT: [{"id":"...","idx":1,"suggestedStage":"ordinary_world","confidence":0.85}, ...]';
+      const prompt = `${stageHints}\n\n${constraints}\n\n${sceneList}\n\n${outputFormat}`;
+      const { text } = await AIService.complete({ prompt, system, temperature: 0.1, maxTokens: 900 });
+      let body = text.replace(/^```[a-zA-Z]*\n?|```$/g,'').trim();
+      const a = body.indexOf('['); const b = body.lastIndexOf(']'); if (a!==-1 && b!==-1) body = body.slice(a,b+1);
+      let arr = [];
+      try { arr = JSON.parse(body); } catch {}
+      if (!Array.isArray(arr)) { statusEl.textContent = 'Parsing suggerimenti fallito.'; return; }
+      const validSet = new Set(heroStages);
+      const map = new Map();
+      for (const s of arr) {
+        if (!s || (!s.id && !s.idx)) continue;
+        let id = s.id;
+        const idx = Number.isInteger(s.idx) ? s.idx : Number.parseInt(s.idx, 10);
+        if ((!id || !scenes.find(c=>c.id===id)) && idx && idx>=1 && idx<=catalogue.length) id = catalogue[idx-1].id;
+        if (!id) continue;
+        const norm = {
+          id,
+          suggestedStage: validSet.has(s.suggestedStage) ? s.suggestedStage : 'unassigned',
+          confidence: typeof s.confidence === 'number' ? Math.max(0, Math.min(1, s.confidence)) : 0
+        };
+        const prev = map.get(norm.id);
+        if (!prev || norm.confidence > prev.confidence) map.set(norm.id, norm);
+      }
+      const unique = Array.from(map.values());
+      console.table(unique.map(s=>({ id: s.id, stage: s.suggestedStage, conf: s.confidence })));
+      const raw = arr.length; const unici = unique.length; const dups = Math.max(0, raw - unici);
+      statusEl.textContent = `Suggerimenti ricevuti: ${raw} (unici: ${unici}${dups?`, duplicati scartati: ${dups}`:''}). Apri console per dettagli.`;
+    } catch (e) {
+      statusEl.textContent = 'Errore suggerimenti Hero Journey.';
+    } finally {
+      heroSuggestBtn.textContent = 'Hero Journey';
+      heroSuggestBtn.disabled = false;
+    }
+  });
+
   closeBtn.addEventListener('click', hide);
 
   return { open: show, hide };
 }
 
+// API programmatica aggiornata (mantiene retro-compat ma separa parsing/AI)
 export async function importRawText(dataManager, projectId, rawText, { mode = 'merge', split = true, strategy = 'auto', minSceneLength = 300, extract = true, analyzeStyle = true, focus = '' } = {}) {
   // local copies of inner helpers
   const run = async () => {
@@ -602,7 +742,7 @@ export async function importRawText(dataManager, projectId, rawText, { mode = 'm
       const chunks = naiveSplitIntoScenes(raw, strategy, minSceneLength);
       scenes = chunks.map((c, i) => ({ title: `Scena ${i+1}`, synopsis: '', content: c }));
     }
-    let entities = { characters: [], locations: [], objects: [], geography: [], history: [], culture: [] };
+  let entities = { characters: [], locations: [], objects: [], geography: [], history: [], culture: [] };
     let relations = [];
     let plotlines = [];
     let style = null;

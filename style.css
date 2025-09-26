@@ -225,3 +225,19 @@ body {
 
 /* Modals stacking: conferma sempre in primo piano */
 #confirm-modal { z-index: 80 !important; }
+
+/* Drag & drop evidenza scene */
+.scene-card.dragging { opacity: 0.35; filter: grayscale(0.3); }
+.scenes-list.drag-target, #unassigned-scenes.drag-target { background: linear-gradient(90deg, rgba(4,183,214,0.10), rgba(4,183,214,0.04)); transition: background 160ms ease-in-out; }
+.scene-card.drop-indicator { outline: 2px dashed var(--accent); outline-offset: -4px; }
+
+/* Badge stage mini */
+.stage-badge-mini { font-size: 0.55rem; line-height: 1; padding: 2px 4px; border-radius: 4px; letter-spacing: .5px; font-weight:600; display:inline-block; }
+.stage-badge-act1 { background:#047857; color:#e0ffe9; }
+.stage-badge-act2 { background:#3730a3; color:#eef; }
+.stage-badge-act3 { background:#9d174d; color:#ffe6f1; }
+.stage-badge-unassigned { background:#52525b; color:#f2f2f5; }
+
+/* Reorder intra-stage indicators */
+.scene-card.drop-indicator-before { outline:2px solid var(--accent); outline-offset:-2px; box-shadow: inset 0 4px 0 var(--accent); }
+.scene-card.drop-indicator-after { outline:2px solid var(--accent); outline-offset:-2px; box-shadow: inset 0 -4px 0 var(--accent); }

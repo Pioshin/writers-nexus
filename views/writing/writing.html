@@ -6,7 +6,13 @@
                     <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>
                     Torna alla Struttura
                 </button>
-                <h2 id="writing-scene-title" class="text-3xl md:text-4xl font-display">Scrittura Scena</h2>
+                <div class="flex items-start gap-3 flex-wrap">
+                    <h2 id="writing-scene-title" class="text-3xl md:text-4xl font-display">Scrittura Scena</h2>
+                    <div id="writing-stage-badge" class="mt-1 hidden flex items-center gap-2 bg-primary/60 border border-accent/30 rounded px-2 py-1 text-xs">
+                        <span id="writing-stage-label" class="font-semibold"></span>
+                        <button id="writing-stage-edit" class="text-[10px] px-1 py-0.5 rounded bg-secondary/70 hover:bg-secondary border border-accent/30">Cambia</button>
+                    </div>
+                </div>
             </div>
             <div class="flex items-end gap-6">
                 <div class="text-right">
@@ -33,6 +39,27 @@
         <!-- Editor a blocchi -->
         <section class="flex-1 flex flex-col min-w-0">
             <div id="scene-meta" class="text-secondary text-sm mb-3"></div>
+            <div id="scene-stage-inline-edit" class="hidden mb-3 bg-secondary/40 border border-accent/20 p-3 rounded flex flex-wrap gap-2 items-center">
+                <label class="text-xs font-semibold">Stadio viaggio eroe:</label>
+                <select id="scene-stage-select-writing" class="text-xs bg-primary/70 border border-accent/30 rounded px-2 py-1">
+                    <option value="unassigned">(Non assegnata)</option>
+                    <option value="ordinary_world">Mondo Ordinario</option>
+                    <option value="call_to_adventure">Chiamata</option>
+                    <option value="refusal_of_call">Rifiuto</option>
+                    <option value="meeting_mentor">Mentore</option>
+                    <option value="crossing_threshold">Soglia</option>
+                    <option value="tests_allies_enemies">Prove/Alleati/Nemici</option>
+                    <option value="inmost_cave">Avvicinamento</option>
+                    <option value="ordeal">Prova Centrale</option>
+                    <option value="reward">Ricompensa</option>
+                    <option value="road_back">Via del Ritorno</option>
+                    <option value="resurrection">Resurrezione</option>
+                    <option value="return_with_elixir">Ritorno</option>
+                </select>
+                <button id="scene-stage-save" class="text-xs px-2 py-1 bg-accent text-primary rounded border border-accent/30 hover:bg-accent-hover">Salva</button>
+                <button id="scene-stage-cancel" class="text-xs px-2 py-1 bg-primary rounded border border-accent/30 hover:bg-opacity-80">Annulla</button>
+                <div id="scene-stage-feedback" class="text-[10px] text-secondary"></div>
+            </div>
             <div id="blocks-container" class="flex-1 overflow-y-auto space-y-3 p-2 bg-secondary/30 border border-accent/10 rounded-lg"></div>
             <div class="flex justify-between items-center mt-3">
                 <button id="add-block-btn" class="flex items-center px-3 py-2 bg-accent text-primary font-bold rounded-lg hover:bg-accent-hover transition"><i data-lucide="plus" class="w-4 h-4 mr-2"></i>Aggiungi Paragrafo</button>

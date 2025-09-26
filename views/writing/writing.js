@@ -5,6 +5,8 @@ let blocksContainer, scenesNav, sceneMetaEl, prevBtn, nextBtn, addBlockBtn;
 let orderedScenes = [];
 let saveTimeout;
 let manuscriptOverlay, manuscriptContent, manuscriptToggleBtn, manuscriptCloseBtn, manuscriptWordsEl, manuscriptPagesEl, focusToggleBtn, anchorsNav;
+let stageBadgeEl, stageLabelEl, stageEditBtn, stageInlineEditWrap, stageSelectEl, stageSaveBtn, stageCancelBtn, stageFeedbackEl;
+import { StageUndo } from '../shared/stage-undo.js';
 const WORDS_PER_PAGE = 300;
 
 async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
@@ -29,6 +31,14 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
     manuscriptPagesEl = document.getElementById('manuscript-pages');
     focusToggleBtn = document.getElementById('toggle-focus-mode');
     anchorsNav = document.getElementById('manuscript-anchors');
+    stageBadgeEl = document.getElementById('writing-stage-badge');
+    stageLabelEl = document.getElementById('writing-stage-label');
+    stageEditBtn = document.getElementById('writing-stage-edit');
+    stageInlineEditWrap = document.getElementById('scene-stage-inline-edit');
+    stageSelectEl = document.getElementById('scene-stage-select-writing');
+    stageSaveBtn = document.getElementById('scene-stage-save');
+    stageCancelBtn = document.getElementById('scene-stage-cancel');
+    stageFeedbackEl = document.getElementById('scene-stage-feedback');
 
     backBtn.addEventListener('click', () => switchView('structure'));
 
@@ -39,7 +49,7 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
     }
 
     // Preleva l'ordine delle scene dalla Struttura (tutte le tappe in sequenza)
-    const stages = ['ordinary_world','call_to_adventure','refusal_of_call','meeting_mentor','crossing_threshold','tests_allies_enemies','inmost_cave','ordeal','reward','road_back','resurrection','return_with_elixir'];
+    const stages = ['unassigned','ordinary_world','call_to_adventure','refusal_of_call','meeting_mentor','crossing_threshold','tests_allies_enemies','inmost_cave','ordeal','reward','road_back','resurrection','return_with_elixir'];
     orderedScenes = [];
     for (const stageKey of stages) {
         const scenes = await DataManager.getScenesForStage(projectId, stageKey);
@@ -63,6 +73,44 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
     // Render nav e editor
     renderScenesNav();
     await loadSceneIntoEditor(currentScene);
+
+    // Gestione badge stage
+    if (stageEditBtn && stageBadgeEl) {
+        stageEditBtn.addEventListener('click', () => {
+            if (!currentScene) return;
+            stageSelectEl.value = currentScene.stageKey || 'unassigned';
+            stageInlineEditWrap.classList.remove('hidden');
+            stageFeedbackEl.textContent = '';
+        });
+    }
+    if (stageCancelBtn) {
+        stageCancelBtn.addEventListener('click', () => {
+            stageInlineEditWrap.classList.add('hidden');
+        });
+    }
+    if (stageSaveBtn) {
+        stageSaveBtn.addEventListener('click', async () => {
+            if (!currentScene) return;
+            const newStage = stageSelectEl.value;
+            if (newStage === currentScene.stageKey) {
+                stageFeedbackEl.textContent = 'Nessuna modifica.';
+                return;
+            }
+            try {
+                StageUndo.record(currentScene.id, currentScene.stageKey, newStage);
+                currentScene = await DataManager.saveScene({ ...currentScene, stageKey: newStage });
+                // Ricostruisci orderedScenes (scena si sposta di sezione)
+                await rebuildOrderedScenes();
+                renderScenesNav();
+                updateStageBadge();
+                stageInlineEditWrap.classList.add('hidden');
+                stageFeedbackEl.textContent = '';
+            } catch (e) {
+                console.error(e);
+                stageFeedbackEl.textContent = 'Errore salvataggio';
+            }
+        });
+    }
 
     prevBtn.addEventListener('click', () => goToAdjacent(-1));
     nextBtn.addEventListener('click', () => goToAdjacent(1));
@@ -143,6 +191,7 @@ async function loadSceneIntoEditor(scene) {
     sceneTitleEl.textContent = scene.title || 'Scena senza titolo';
     sceneMetaEl.textContent = scene.synopsis ? `Sinossi: ${scene.synopsis}` : '';
     blocksContainer.innerHTML = '';
+    updateStageBadge();
 
     const blocks = scene.blocks && Array.isArray(scene.blocks) ? scene.blocks : (scene.content ? [{ type: 'text', content: scene.content }] : []);
     if (blocks.length === 0) {
@@ -203,6 +252,81 @@ function updateWordCount() {
     });
     wordCountEl.textContent = total;
 }
+
+function stageLabelFor(key) {
+    const map = {
+        unassigned: 'Non assegnata',
+        ordinary_world: 'Mondo Ordinario',
+        call_to_adventure: 'Chiamata',
+        refusal_of_call: 'Rifiuto',
+        meeting_mentor: 'Mentore',
+        crossing_threshold: 'Soglia',
+        tests_allies_enemies: 'Prove / Alleati / Nemici',
+        inmost_cave: 'Avvicinamento',
+        ordeal: 'Prova Centrale',
+        reward: 'Ricompensa',
+        road_back: 'Via del Ritorno',
+        resurrection: 'Resurrezione',
+        return_with_elixir: 'Ritorno con Elisir'
+    };
+    return map[key] || key;
+}
+
+function updateStageBadge() {
+    if (!stageBadgeEl || !currentScene) return;
+    stageLabelEl.textContent = stageLabelFor(currentScene.stageKey || 'unassigned');
+    stageBadgeEl.classList.remove('hidden');
+    // Colori dinamici leggeri per atto: definizione semplice per ora
+    const stage = currentScene.stageKey || 'unassigned';
+    let hueClass = 'bg-primary/60';
+    if (['ordinary_world','call_to_adventure','refusal_of_call','meeting_mentor'].includes(stage)) hueClass = 'bg-emerald-700/60';
+    else if (['crossing_threshold','tests_allies_enemies','inmost_cave'].includes(stage)) hueClass = 'bg-indigo-700/60';
+    else if (['ordeal','reward','road_back','resurrection','return_with_elixir'].includes(stage)) hueClass = 'bg-rose-700/60';
+    else if (stage === 'unassigned') hueClass = 'bg-zinc-600/60';
+    stageBadgeEl.className = `mt-1 flex items-center gap-2 border border-accent/30 rounded px-2 py-1 text-xs ${hueClass}`;
+}
+
+async function rebuildOrderedScenes() {
+    const projectId = await DataManager.getCurrentProjectId();
+    const stages = ['unassigned','ordinary_world','call_to_adventure','refusal_of_call','meeting_mentor','crossing_threshold','tests_allies_enemies','inmost_cave','ordeal','reward','road_back','resurrection','return_with_elixir'];
+    orderedScenes = [];
+    for (const stageKey of stages) {
+        const scenes = await DataManager.getScenesForStage(projectId, stageKey);
+        orderedScenes.push(...scenes);
+    }
+}
+
+// Shortcut: apri modifica stage corrente - Ctrl+Shift+J
+document.addEventListener('keydown', (e) => {
+    const view = document.getElementById('view-writing');
+    if (!view || view.classList.contains('hidden')) return;
+    if (e.ctrlKey && e.shiftKey && (e.key === 'j' || e.key === 'J')) {
+        if (!stageInlineEditWrap.classList.contains('hidden')) return;
+        e.preventDefault();
+        if (currentScene) {
+            stageSelectEl.value = currentScene.stageKey || 'unassigned';
+            stageInlineEditWrap.classList.remove('hidden');
+            stageFeedbackEl.textContent = '';
+        }
+    }
+});
+
+// Shortcut: undo ultimo cambio stage - Ctrl+Alt+Z (anche in writing)
+document.addEventListener('keydown', async (e) => {
+    const view = document.getElementById('view-writing');
+    if (!view || view.classList.contains('hidden')) return;
+    if (e.ctrlKey && e.altKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        const res = await StageUndo.undoLast();
+        if (res?.ok) {
+            // scena corrente potrebbe essere stata spostata: ricarica ordered
+            await rebuildOrderedScenes();
+            if (currentScene) currentScene = await DataManager.getScene(currentScene.id);
+            renderScenesNav();
+            updateStageBadge();
+        }
+    }
+});
 
 async function saveContent() {
     if (!currentScene) return;
