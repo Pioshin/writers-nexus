@@ -41,6 +41,30 @@ Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensat
    ```
 3. Apri il browser sull’URL mostrato in console (es. http://127.0.0.1:55099)
 
+## Screenshots
+
+> Alcune schermate dell’app (le immagini sono in `docs/screenshots/`).
+
+- Dashboard
+  
+  ![Dashboard](./docs/screenshots/dashboard.png)
+
+- Ideazione
+  
+  ![Ideazione](./docs/screenshots/ideation.png)
+
+- Struttura (con "Scene non assegnate")
+  
+  ![Struttura](./docs/screenshots/structure.png)
+
+- Suggerimenti IA (modale)
+  
+  ![Suggerimenti IA](./docs/screenshots/hero-suggestions.png)
+
+- Scrittura
+  
+  ![Scrittura](./docs/screenshots/writing.png)
+
 ## Configurazioni opzionali
 
 ### IA
