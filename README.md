@@ -1,0 +1,77 @@
+# Writers Nexus
+
+Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensata per lavorare anche senza connessione, con sincronizzazione remota opzionale.
+
+## Caratteristiche (v1.0)
+
+- Importazione testo e segmentazione in scene (senza IA di default)
+- Struttura (Viaggio dell’Eroe)
+  - Sezione “Scene non assegnate” + batch tagging
+  - Drag & drop tra tappe
+  - Riordino intra‑stage con campo `order` persistente
+  - Badge stage e cambio stage in linea
+  - Undo cambio stage (scorciatoia: Ctrl+Alt+Z)
+- Suggerimenti IA (Viaggio dell’Eroe)
+  - Prompt e parsing robusti (stadi consentiti, IDX, JSON cleaning)
+  - Dedup per scena (mantiene confidenza più alta)
+  - Filtro per confidenza, selezione, auto‑assegna ≥ soglia
+- Scrittura
+  - Editor a blocchi con conteggio parole
+  - Navigator scene in ordine struttura
+  - Badge stage e “Cambia” in linea (Ctrl+Shift+J)
+  - Vista “Manoscritto” full screen
+- UI/Temi
+  - Palette per generi (sci‑fi, fantasy, thriller, romance)
+  - Sfondi opachi per massima leggibilità
+
+## Requisiti
+
+- Node.js ≥ 18
+- NPM
+
+## Avvio locale
+
+1. Installa le dipendenze
+   ```bash
+   npm install
+   ```
+2. Avvia il server di sviluppo
+   ```bash
+   npm run start
+   ```
+3. Apri il browser sull’URL mostrato in console (es. http://127.0.0.1:55099)
+
+## Configurazioni opzionali
+
+### IA
+- Apri Impostazioni → sezione IA.
+- Imposta Provider (OpenAI‑compatibile, Ollama, Anthropic, Google), Base URL (se richiesto), Modello, API Key.
+- La funzionalità “Suggerimenti Viaggio dell’Eroe” ne farà uso quando richiesta.
+
+### Sincronizzazione (Firebase)
+- L’app funziona interamente in locale (IndexedDB). La sincronizzazione remota è facoltativa.
+- Per abilitarla, inserisci in Impostazioni le credenziali Firebase (config oggetto) ed effettua login.
+- Senza configurazione, l’app resta in Modalità Offline e i dati restano sul tuo dispositivo.
+
+## Limitazioni (v1.0)
+
+- Nessun collegamento obbligatorio al database remoto (sync Firebase opzionale)
+- Editing avanzato e Analisi in via di sviluppo
+- Undo batch (es. per riordino) non ancora disponibile
+
+## Architettura dati
+
+- Storage locale: IndexedDB (via libreria `idb`), orchestrato da `DataManager`
+- Store principali: `projects`, `scenes`, `ideas`, `characters`, `locations`, `objects`, `geography`, `history`, `culture`, `plotlines`, `systems`, `settings`
+- `scenes` include `stageKey` (tappa Viaggio dell’Eroe) e `order` (ordinamento intra‑stage)
+- Sincronizzazione opzionale con Firestore tramite `FirebaseSync`
+
+## Roadmap
+
+- Migliorie undo/redo (batch, riordino)
+- Analisi e editing avanzati
+- Esportazione/Importazione progetto JSON
+
+---
+
+Copyright © 2025
