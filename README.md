@@ -2,6 +2,13 @@
 
 Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensata per lavorare anche senza connessione, con sincronizzazione remota opzionale.
 
+![GitHub Release](https://img.shields.io/github/v/release/Pioshin/writers-nexus)
+![License](https://img.shields.io/badge/license-MIT-blue)
+[![Discussions](https://img.shields.io/badge/Join-Discussions-4b8bbe)](https://github.com/Pioshin/writers-nexus/discussions)
+[![Issues](https://img.shields.io/badge/Report-Issues-orange)](https://github.com/Pioshin/writers-nexus/issues)
+[![Ko‑fi](https://img.shields.io/badge/Ko--fi-Donate-ff5f5f)](https://ko-fi.com/Pioshin)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C)](https://www.paypal.me/Pioshin)
+
 ## Caratteristiche (v1.0)
 
 - Importazione testo e segmentazione in scene (senza IA di default)
@@ -95,6 +102,13 @@ Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensat
 - Migliorie undo/redo (batch, riordino)
 - Analisi e editing avanzati
 - Esportazione/Importazione progetto JSON
+
+## Community & Contributi
+
+- Partecipa alle [Discussions](https://github.com/Pioshin/writers-nexus/discussions) per idee, domande e feedback.
+- Segnala bug e proponi feature in [Issues](https://github.com/Pioshin/writers-nexus/issues).
+- Leggi [CONTRIBUTING](./.github/CONTRIBUTING.md) e apri una PR.
+- Se vuoi supportare il progetto: [Ko‑fi](https://ko-fi.com/Pioshin) • [PayPal](https://www.paypal.me/Pioshin)
 
 ---
 
