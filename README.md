@@ -106,8 +106,8 @@ Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensat
 ## Community & Contributi
 
 - Partecipa alle [Discussions](https://github.com/Pioshin/writers-nexus/discussions) per idee, domande e feedback.
-- Segnala bug e proponi feature in [Issues](https://github.com/Pioshin/writers-nexus/issues).
-- Leggi [CONTRIBUTING](./.github/CONTRIBUTING.md) e apri una PR.
+- Segnala bug in [Issues](https://github.com/Pioshin/writers-nexus/issues).
+- Nota: al momento non accettiamo Pull Request esterne.
 - Se vuoi supportare il progetto: [Ko‑fi](https://ko-fi.com/Pioshin) • [PayPal](https://www.paypal.me/Pioshin)
 
 ---
