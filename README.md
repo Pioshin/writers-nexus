@@ -1,13 +1,23 @@
 # Writers Nexus
 
-Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensata per lavorare anche senza connessione, con sincronizzazione remota opzionale.
+Una suite per la creazione di opere letterarie, dall’idea alla pubblicazione. Ti accompagna in ogni fase — ideazione, organizzazione, scrittura e revisione — con strumenti semplici ma potenti e con il supporto dell’IA, che ti guida passo dopo passo anche se è il tuo primo progetto editoriale.
+
+Funziona direttamente nel browser e anche offline, così puoi lavorare ovunque e in qualsiasi momento; quando desideri, puoi sincronizzare i tuoi lavori nel cloud. L’interfaccia è attualmente in italiano; il rilascio in altre lingue è previsto, a partire dall’inglese.
 
 ![GitHub Release](https://img.shields.io/github/v/release/Pioshin/writers-nexus)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 [![Discussions](https://img.shields.io/badge/Join-Discussions-4b8bbe)](https://github.com/Pioshin/writers-nexus/discussions)
 [![Issues](https://img.shields.io/badge/Report-Issues-orange)](https://github.com/Pioshin/writers-nexus/issues)
-[![Ko‑fi](https://img.shields.io/badge/Ko--fi-Donate-ff5f5f)](https://ko-fi.com/Pioshin)
-[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C)](https://www.paypal.me/Pioshin)
+
+## Caratteristiche principali
+
+- Ideazione e schede dedicate per personaggi, luoghi, oggetti e sistemi
+- Struttura narrativa (Viaggio dell’Eroe) con drag & drop e gestione delle scene non assegnate
+- Suggerimenti assistiti dall’IA per inquadrare le scene e trovare ispirazione
+- Editor di scrittura con conteggio parole e vista manoscritto a schermo intero
+- Dashboard e panoramiche per orientarti nel progetto
+- Temi e palette per genere, con interfaccia curata e leggibile
+- Dati sempre tuoi: offline‑first con sincronizzazione remota facoltativa
 
 ## Caratteristiche (v1.0)
 
@@ -108,7 +118,7 @@ Un'app web offline‑first per organizzare, scrivere e analizzare storie. Pensat
 - Partecipa alle [Discussions](https://github.com/Pioshin/writers-nexus/discussions) per idee, domande e feedback.
 - Segnala bug in [Issues](https://github.com/Pioshin/writers-nexus/issues).
 - Nota: al momento non accettiamo Pull Request esterne.
-- Se vuoi supportare il progetto: [Ko‑fi](https://ko-fi.com/Pioshin) • [PayPal](https://www.paypal.me/Pioshin)
+- Se vuoi supportare il progetto, utilizza il pulsante "Sponsor" visibile nella homepage del repository.
 
 ---
 

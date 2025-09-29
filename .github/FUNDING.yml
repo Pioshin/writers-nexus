@@ -3,9 +3,6 @@
 # GitHub Sponsors
 # github: [Pioshin]
 
-# Ko-fi
-ko_fi: Pioshin
-
 # Buy Me a Coffee
 buy_me_a_coffee: Pioshin
 
@@ -13,5 +10,5 @@ buy_me_a_coffee: Pioshin
 # open_collective: your-collective
 
 # Custom donation links (e.g., PayPal, Stripe)
-custom:
-  - https://www.paypal.me/Pioshin
+# custom:
+#   - https://example.com/support
