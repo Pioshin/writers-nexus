@@ -140,11 +140,25 @@ export default {
     loadProjects();
 
     // Listen for data changes
+    // Listen for data changes
     window.addEventListener('datachanged', e => {
       if (e.detail && e.detail.storeName === 'projects') {
         console.log('Project data changed, reloading project list.');
         loadProjects();
       }
     });
+
+    // Close alert handler
+    // document.getElementById('close-alerts')?.addEventListener('click', () => {
+    //   document.getElementById('consistency-alerts').classList.add('hidden');
+    // });
+
+    // Quick fix helper for ghost chars (quick and dirty global exposure)
+    window.createGhostChar = async (name) => {
+      const modal = await loadModal('character'); // Assuming generic char modal
+      // Ideally we pre-fill. If modal supports it.
+      // For now just open it.
+      modal.open({ name });
+    };
   },
 };

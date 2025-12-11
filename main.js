@@ -1,19 +1,26 @@
+
 import { DataManager } from './DataManager.js';
 import { FirebaseSync } from './FirebaseSync.js';
 import { ThemeManager } from './ThemeManager.js';
 import { AIService } from './ai/AIService.js';
+import { AIPanel } from './ai/AIPanel.js';
+import { ConsistencyEngine } from './js/ConsistencyEngine.js'; // Import engine
 
 // --- STATE ---
 let isOfflineMode = false;
 let syncModal = null;
 let configModal = null;
 let importTextModal = null;
+let consistencyEngine; // Added
+let currentView = 'dashboard'; // Added
+let OverlayModule; // Added
 
 // --- DOM ELEMENT VARIABLES ---
 let authScreen,
   appScreen,
   mainNav,
   mainContentArea,
+  viewContainer,
   themeSelector,
   showConfigBtn,
   sidebarSettingsBtn,
@@ -28,6 +35,7 @@ let authScreen,
   currentProjectNameEl;
 let openAiBtn;
 let openImportBtn;
+let mobileMenuBtn, sidebar, mobileOverlay; // Mobile menu vars
 let aiAssistantModal;
 let confirmModal;
 
@@ -59,19 +67,19 @@ const uiNotifier = {
     switch (status) {
       case 'LOCAL_NEWER':
         title = 'Modifiche Locali Rilevate';
-        message = `Hai ${diff.local.length} modifiche non sincronizzate. Vuoi caricarle ora?`;
+        message = `Hai ${diff.local.length} modifiche non sincronizzate.Vuoi caricarle ora ? `;
         primaryBtnText = 'Carica Modifiche';
         onPrimary = () => DataManager.uploadLocalData();
         break;
       case 'REMOTE_NEWER':
         title = 'Dati Remoti Più Recenti';
-        message = `Ci sono ${diff.remote.length} aggiornamenti sul server. Vuoi scaricarli ora? (Le modifiche locali non sincronizzate verranno perse)`;
+        message = `Ci sono ${diff.remote.length} aggiornamenti sul server.Vuoi scaricarli ora ? (Le modifiche locali non sincronizzate verranno perse)`;
         primaryBtnText = 'Scarica Dati';
         onPrimary = () => DataManager.downloadRemoteData();
         break;
       case 'DIVERGED':
         title = 'Dati Divergenti';
-        message = `Hai ${diff.local.length} modifiche locali e ${diff.remote.length} modifiche remote. Scegli quale versione mantenere.`;
+        message = `Hai ${diff.local.length} modifiche locali e ${diff.remote.length} modifiche remote.Scegli quale versione mantenere.`;
         primaryBtnText = 'Mantieni Dati Remoti';
         onPrimary = () => DataManager.downloadRemoteData();
         break;
@@ -98,10 +106,16 @@ async function initializeApp() {
   authScreen = document.getElementById('auth-screen');
   appScreen = document.getElementById('app-screen');
   mainNav = document.getElementById('main-nav');
+  mainNav = document.getElementById('main-nav');
   mainContentArea = document.getElementById('main-content-area');
+  viewContainer = document.getElementById('view-container') || mainContentArea; // Fallback
   themeSelector = document.getElementById('theme-selector');
   showConfigBtn = document.getElementById('show-config-btn');
   sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
+  // Mobile menu
+  mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  sidebar = document.getElementById('sidebar');
+  mobileOverlay = document.getElementById('mobile-overlay');
   openAiBtn = document.getElementById('open-ai-assistant');
   openImportBtn = document.getElementById('open-import-text');
   loginForm = document.getElementById('login-form');
@@ -116,6 +130,17 @@ async function initializeApp() {
 
   await ThemeManager.init(themeSelector);
   const settings = await DataManager.getSettings();
+
+  // Initialize Global AI Panel
+  window.aiPanel = new AIPanel(DataManager);
+
+  // Init Consistency Engine
+  // Assuming 'toast' is a global function or object available, or needs to be imported/defined.
+  // For now, using a placeholder if not defined elsewhere.
+  const toast = window.toast || console.log; // Placeholder for toast function
+  consistencyEngine = new ConsistencyEngine(DataManager, toast, AIService); // Pass AIService
+  window.consistencyEngine = consistencyEngine; // Expose globally for views
+  consistencyEngine.init();
 
   // Pre-load modals
   configModal = await loadModal('config');
@@ -160,7 +185,7 @@ async function initializeApp() {
         'text-center text-xs p-2 rounded-lg bg-green-500/20 text-green-300';
       setupAuthObserver();
     } else {
-      configStatusEl.textContent = `Errore Firebase: ${initResult.error}`;
+      configStatusEl.textContent = `Errore Firebase: ${initResult.error} `;
       configStatusEl.className =
         'text-center text-xs p-2 rounded-lg bg-red-500/20 text-red-300';
       launchOfflineMode();
@@ -229,8 +254,25 @@ function setupAuthObserver() {
 function setupEventListeners() {
   mainNav.addEventListener('click', e => {
     const navItem = e.target.closest('.nav-item');
-    if (navItem && navItem.dataset.view) switchView(navItem.dataset.view);
+    if (navItem && navItem.dataset.view) {
+      switchView(navItem.dataset.view);
+      // Close mobile menu on navigate
+      if (window.innerWidth < 768) {
+        closeMobileMenu();
+      }
+    }
   });
+
+  // Mobile Menu Toggles
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('-translate-x-full');
+      mobileOverlay.classList.toggle('hidden');
+    });
+  }
+  if (mobileOverlay) {
+    mobileOverlay.addEventListener('click', closeMobileMenu);
+  }
 
   showConfigBtn.addEventListener('click', () => configModal?.open());
   // Shortcut per aprire l'assistente IA
@@ -281,37 +323,76 @@ function setupEventListeners() {
 async function switchView(viewName) {
   const myToken = ++currentViewToken;
 
+  // Notify AI Panel of context change
+  if (window.aiPanel) window.aiPanel.updateContext(viewName);
+
+  // Update Nav State
   document.querySelectorAll('#main-nav .nav-item').forEach(item => {
-    const isTarget = item.dataset.view === viewName;
-    item.classList.toggle('bg-primary', isTarget);
+    const isActive = item.dataset.view === viewName;
+    const innerDiv = item.firstElementChild;
+    // Toggle active logic for both standard CSS/Tailwind
+    if (innerDiv) {
+      if (isActive) {
+        innerDiv.setAttribute('data-active', 'true');
+        innerDiv.classList.add('bg-accent/10', 'text-accent');
+      } else {
+        innerDiv.setAttribute('data-active', 'false');
+        innerDiv.classList.remove('bg-accent/10', 'text-accent');
+      }
+      // Reset generic hover if needed
+    }
   });
 
-  // Placeholder di caricamento
-  mainContentArea.innerHTML = `<div class="flex items-center justify-center py-10 text-secondary text-sm"><i data-lucide="loader" class="animate-spin mr-2"></i>Caricamento ${viewName}...</div>`;
-  lucide.createIcons();
+  // Loading state with fade
+  const container = viewContainer || mainContentArea;
+  container.style.opacity = '0';
 
-  try {
-    const response = await fetch(`views/${viewName}/${viewName}.html`);
-    if (!response.ok) throw new Error(`Could not load view: ${viewName}`);
-    const html = await response.text();
-    if (myToken !== currentViewToken) return; // Race abort
-    mainContentArea.innerHTML = html;
-
-    const module = await import(`./views/${viewName}/${viewName}.js`);
-    if (myToken !== currentViewToken) return; // Race abort
-    if (module.default && typeof module.default.init === 'function') {
-      module.default.init(
-        DataManager,
-        isOfflineMode ? null : FirebaseSync,
-        loadModal,
-        switchView
-      );
-    }
+  setTimeout(async () => {
+    container.innerHTML = `<div class="flex flex-col items-center justify-center py-20 text-secondary animate-pulse"><i data-lucide="loader" class="animate-spin mb-4 w-8 h-8"></i><p>Caricamento ${viewName}...</p></div>`;
+    container.style.opacity = '1';
     lucide.createIcons();
-  } catch (error) {
-    if (myToken !== currentViewToken) return; // Evita override di errore da view successiva
-    console.error('Error loading view:', error);
-    mainContentArea.innerHTML = `<p class=\"text-red-500 p-4\">Error loading view: ${viewName}. ${error.message}</p>`;
+
+    try {
+      const response = await fetch(`views/${viewName}/${viewName}.html`);
+      if (!response.ok) throw new Error(`Could not load view: ${viewName}`);
+      const html = await response.text();
+
+      if (myToken !== currentViewToken) return; // Race abort
+
+      // Apply HTML
+      container.style.opacity = '0'; // Brief fade before showing real content
+      setTimeout(async () => {
+        container.innerHTML = html;
+        container.style.opacity = '1';
+
+        const module = await import(`./views/${viewName}/${viewName}.js`);
+        if (myToken !== currentViewToken) return;
+
+        if (module.default && typeof module.default.init === 'function') {
+          module.default.init(
+            DataManager,
+            isOfflineMode ? null : FirebaseSync,
+            loadModal,
+            switchView
+          );
+        }
+        lucide.createIcons();
+      }, 150);
+    } catch (error) {
+      if (myToken !== currentViewToken) return;
+      console.error('Error loading view:', error);
+      container.innerHTML = `<div class=\"p-6 text-center\"><div class=\"inline-block p-4 bg-red-500/10 rounded-lg\"><h3 class=\"text-red-400 font-bold mb-2\">Errore</h3><p class=\"text-secondary\">Impossibile caricare la vista: ${viewName}</p><p class=\"text-xs text-secondary mt-2\">${error.message}</p></div></div>`;
+      container.style.opacity = '1';
+    }
+  }, 100);
+}
+
+function closeMobileMenu() {
+  if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+    sidebar.classList.add('-translate-x-full');
+  }
+  if (mobileOverlay) {
+    mobileOverlay.classList.add('hidden');
   }
 }
 
@@ -337,6 +418,12 @@ async function onSettingsChanged() {
     ) {
       AIService.init(next);
       lastAIConfig = { ...next };
+
+      // Update UI Panel Label
+      if (window.aiPanel && typeof window.aiPanel.updateModelInfo === 'function') {
+        window.aiPanel.updateModelInfo();
+      }
+
       console.info('[AI] Re-inizializzata per modifica configurazione.');
     }
   } catch (err) {

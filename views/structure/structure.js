@@ -1,7 +1,6 @@
 let DataManager, FirebaseSync, loadModal, switchView;
 let currentProjectId;
 let sceneEditorModal = null;
-let heroSuggestionsModal = null;
 const UNASSIGNED_KEY = 'unassigned';
 let unassignedSelection = new Set();
 import { StageUndo } from '../shared/stage-undo.js';
@@ -34,7 +33,7 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
   switchView = viewSwitcher;
 
   sceneEditorModal = await loadModal('scene-editor');
-  heroSuggestionsModal = await loadModal('hero-suggestions');
+
   document.addEventListener('scene-saved', handleSceneSaved);
 
   currentProjectId = await DataManager.getCurrentProjectId();
@@ -67,11 +66,6 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
     .getElementById('global-collapse-all')
     ?.addEventListener('click', () => {
       ['act-1', 'act-2', 'act-3'].forEach(id => toggleAllStages(id, false));
-    });
-  document
-    .getElementById('open-hero-suggestions')
-    ?.addEventListener('click', () => {
-      heroSuggestionsModal?.open();
     });
 
   document.addEventListener('hero-suggestions-applied', () => {

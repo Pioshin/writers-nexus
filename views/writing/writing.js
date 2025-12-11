@@ -163,7 +163,7 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
       }
       aiModal?.open?.();
     });
-  } catch {}
+  } catch { }
 
   // Manuscript overlay events
   document
@@ -195,6 +195,22 @@ async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
     if (e.altKey && e.key === '2') {
       e.preventDefault();
       toggleHeading(active, 'h2');
+    }
+  });
+
+  // Handle AI Insertion
+  window.addEventListener('ai-action-insert', (e) => {
+    // Only verify if we are in Writing view (container visible)
+    const container = document.getElementById('view-writing');
+    if (!container || container.classList.contains('hidden')) return;
+
+    // Only accept if context matches or is generic
+    if (e.detail && e.detail.text) {
+      appendTextBlock(e.detail.text);
+      updateWordCount();
+      scheduleSave();
+      // Optional: scroll to bottom
+      blocksContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
     }
   });
 }

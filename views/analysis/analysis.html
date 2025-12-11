@@ -1,117 +1,118 @@
 <div id="view-analysis" class="view-content">
-  <div
-    class="border-b border-accent/20 mb-6 pb-4 flex items-center justify-between"
-  >
+  <div class="border-b border-accent/20 mb-6 pb-4 flex items-center justify-between">
     <h2 class="text-4xl font-display">Analisi</h2>
     <div class="flex gap-2">
-      <button
-        id="open-plotlines"
-        class="flex items-center text-sm px-3 py-1 bg-secondary text-primary rounded-lg border border-accent/30 hover:bg-primary"
-      >
+      <button id="open-plotlines"
+        class="flex items-center text-sm px-3 py-1 bg-secondary text-primary rounded-lg border border-accent/30 hover:bg-primary">
         <i data-lucide="git-branch" class="mr-1 h-4 w-4"></i>Linee
       </button>
-      <button
-        id="import-fixture"
+      <button id="import-fixture"
         class="flex items-center text-sm px-3 py-1 bg-secondary text-primary rounded-lg border border-accent/30 hover:bg-primary"
-        title="Importa testo di test"
-      >
+        title="Importa testo di test">
         <i data-lucide="file-plus" class="mr-1 h-4 w-4"></i>Importa Fixture
       </button>
-      <button
-        id="refresh-analysis"
-        class="flex items-center text-sm px-3 py-1 bg-secondary text-primary rounded-lg border border-accent/30 hover:bg-primary"
-      >
+      <button id="refresh-analysis"
+        class="flex items-center text-sm px-3 py-1 bg-secondary text-primary rounded-lg border border-accent/30 hover:bg-primary">
         <i data-lucide="refresh-cw" class="mr-1 h-4 w-4"></i>Aggiorna
       </button>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-    <section class="bg-secondary border border-accent/20 rounded-xl p-4">
-      <h3 class="text-2xl font-display mb-2">Viaggio dell'Eroe</h3>
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+    <section class="card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="compass" class="w-6 h-6 text-accent"></i>Viaggio
+        dell'Eroe
+      </h3>
       <canvas id="hero-gauge" width="360" height="220" class="w-full"></canvas>
-      <div id="hero-gauge-legend" class="text-xs text-secondary mt-2"></div>
+      <div id="hero-gauge-legend" class="text-xs text-secondary mt-4 text-center"></div>
     </section>
-    <section class="bg-secondary border border-accent/20 rounded-xl p-4">
-      <h3 class="text-2xl font-display mb-2">Distribuzione Personaggi</h3>
+    <section class="card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="pie-chart" class="w-6 h-6 text-accent"></i>Distribuzione
+        Personaggi
+      </h3>
       <canvas id="character-pie" height="240" class="w-full"></canvas>
     </section>
   </div>
 
-  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-    <section
-      class="xl:col-span-1 bg-secondary border border-accent/20 rounded-xl p-4"
-    >
-      <h3 class="text-2xl font-display mb-2">Linee Narrative</h3>
-      <div id="plotlines-list" class="space-y-2"></div>
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+    <section class="xl:col-span-1 card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="git-branch" class="w-6 h-6 text-accent"></i>Linee
+        Narrative
+      </h3>
+      <div id="plotlines-list" class="space-y-3 custom-scrollbar overflow-y-auto max-h-[400px]"></div>
     </section>
-    <section
-      class="xl:col-span-2 bg-secondary border border-accent/20 rounded-xl p-4"
-    >
-      <h3 class="text-2xl font-display mb-2">Bilanciamento Personaggi</h3>
-      <div id="character-balance" class="overflow-x-auto">
-        <table class="w-full text-sm">
+    <section class="xl:col-span-2 card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="users" class="w-6 h-6 text-accent"></i>Bilanciamento
+        Personaggi
+      </h3>
+      <div id="character-balance" class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-sm border-separate border-spacing-y-2">
           <thead>
-            <tr class="text-secondary border-b border-accent/20">
-              <th class="text-left py-2 pr-2">Personaggio</th>
-              <th class="text-left py-2 pr-2">Menzioni</th>
-              <th class="text-left py-2 pr-2">Scene con menzione</th>
-              <th class="text-left py-2 pr-2">Ruolo</th>
-              <th class="text-left py-2 pr-2">Archetipo</th>
+            <tr class="text-secondary/70 uppercase text-xs tracking-wider">
+              <th class="text-left pb-2 pr-4 font-normal">Personaggio</th>
+              <th class="text-left pb-2 pr-4 font-normal">Menzioni</th>
+              <th class="text-left pb-2 pr-4 font-normal">Scene</th>
+              <th class="text-left pb-2 pr-4 font-normal">Ruolo</th>
+              <th class="text-left pb-2 pr-4 font-normal">Archetipo</th>
             </tr>
           </thead>
-          <tbody id="character-balance-body"></tbody>
+          <tbody id="character-balance-body" class="space-y-2"></tbody>
         </table>
       </div>
     </section>
   </div>
 
-  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
-    <section
-      class="xl:col-span-2 bg-secondary border border-accent/20 rounded-xl p-4"
-    >
-      <h3 class="text-2xl font-display mb-2">Metriche Scene</h3>
-      <div id="scene-metrics" class="overflow-x-auto">
-        <table class="w-full text-sm">
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+    <section class="xl:col-span-2 card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="activity" class="w-6 h-6 text-accent"></i>Metriche Scene
+      </h3>
+      <div id="scene-metrics" class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-sm border-separate border-spacing-y-2">
           <thead>
-            <tr class="text-secondary border-b border-accent/20">
-              <th class="text-left py-2 pr-2">Scena</th>
-              <th class="text-left py-2 pr-2">Lungh. (parole)</th>
-              <th class="text-left py-2 pr-2">Stim. ritmo</th>
+            <tr class="text-secondary/70 uppercase text-xs tracking-wider">
+              <th class="text-left pb-2 pr-4 font-normal">Scena</th>
+              <th class="text-left pb-2 pr-4 font-normal">Lungh. (parole)</th>
+              <th class="text-left pb-2 pr-4 font-normal">Stim. ritmo</th>
             </tr>
           </thead>
           <tbody id="scene-metrics-body"></tbody>
         </table>
       </div>
     </section>
-    <section
-      class="xl:col-span-1 bg-secondary border border-accent/20 rounded-xl p-4"
-    >
-      <h3 class="text-2xl font-display mb-2">Profilo Stile</h3>
-      <div id="style-profile" class="text-sm text-secondary"></div>
+    <section class="xl:col-span-1 card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="fingerprint" class="w-6 h-6 text-accent"></i>Profilo
+        Stile
+      </h3>
+      <div id="style-profile" class="text-sm text-secondary bg-primary/30 p-4 rounded-lg border border-white/5"></div>
     </section>
   </div>
 
-  <div class="grid grid-cols-1 gap-6 mt-6">
-    <section class="bg-secondary border border-accent/20 rounded-xl p-4">
-      <h3 class="text-2xl font-display mb-2">
-        Matrice Intersezioni Linee Narrative
+  <div class="grid grid-cols-1 gap-6 mb-8">
+    <section class="card-glass p-6">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="grid" class="w-6 h-6 text-accent"></i>Matrice
+        Intersezioni Linee Narrative
       </h3>
-      <div id="plotlines-matrix" class="overflow-auto text-xs"></div>
+      <div id="plotlines-matrix" class="overflow-x-auto text-xs custom-scrollbar"></div>
     </section>
   </div>
 
-  <div class="grid grid-cols-1 gap-6 mt-6">
-    <section class="bg-secondary border border-accent/20 rounded-xl p-4">
-      <h3 class="text-2xl font-display mb-2">
-        Controllo Sequenza Temporale (non vincolante)
+  <div class="grid grid-cols-1 gap-6">
+    <section class="card-glass p-6 border-l-4 border-l-yellow-500/50">
+      <h3 class="text-2xl font-display mb-2 flex items-center gap-2">
+        <i data-lucide="alert-circle" class="w-6 h-6 text-yellow-500"></i>Controllo Sequenza Temporale
       </h3>
-      <p class="text-xs text-secondary mb-2">
-        Segnala possibili regressioni dallo stadio corrente a uno precedente
-        quando si riordinano le scene. Non è un errore: verifica se è
-        intenzionale (flashback) o va corretto.
+      <p class="text-xs text-secondary mb-4 opacity-80">
+        Analisi non vincolante: segnala possibili regressioni narrative o
+        temporali.
       </p>
-      <div id="sequence-check" class="text-sm"></div>
+      <div id="sequence-check" class="text-sm bg-primary/30 p-4 rounded-lg border border-white/5"></div>
     </section>
   </div>
 </div>

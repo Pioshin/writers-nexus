@@ -1,23 +1,23 @@
 <!doctype html>
 <html lang="it">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Writer's Nexus</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Orbitron:wght@400;700&family=MedievalSharp&family=Special+Elite&family=Dancing+Script&display=swap"
-      rel="stylesheet"
-    />
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Writer's Nexus</title>
 
-    <!-- Import Map for browser-native ES Modules -->
-    <script type="importmap">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Orbitron:wght@400;700&family=MedievalSharp&family=Special+Elite&family=Dancing+Script&display=swap"
+    rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Import Map for browser-native ES Modules -->
+  <script type="importmap">
       {
         "imports": {
           "@google/generative-ai": "https://esm.run/@google/generative-ai"
@@ -25,197 +25,254 @@
       }
     </script>
 
-    <script src="idb.js"></script>
+  <script src="idb.js"></script>
 
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body class="antialiased">
-    <div
-      id="auth-screen"
-      class="min-h-screen flex items-center justify-center p-4 hidden"
-    >
-      <div
-        class="w-full max-w-md bg-secondary shadow-2xl rounded-2xl p-8 space-y-6 border border-accent/20"
-      >
-        <div class="text-center relative">
-          <h1 class="text-4xl font-display accent">Writer's Nexus</h1>
-          <button
-            id="show-config-btn"
-            class="absolute top-0 right-0 p-2 text-secondary hover:accent transition-colors"
-          >
-            <i data-lucide="settings"></i>
-          </button>
-          <p class="text-secondary mt-2">
-            Il tuo copilota per la scrittura creativa.
-          </p>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="antialiased">
+  <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4 hidden relative overflow-hidden">
+    <!-- Background Abstract Elements -->
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+      <div class="absolute top-[-10%] left-[-10%] w-1/2 h-1/2 bg-accent/20 rounded-full blur-[120px]"></div>
+      <div class="absolute bottom-[-10%] right-[-10%] w-1/2 h-1/2 bg-purple-500/20 rounded-full blur-[120px]"></div>
+    </div>
+
+    <div class="w-full max-w-md card-glass p-8 space-y-8 animate-[fadeIn_0.5s_ease-out]">
+      <div class="text-center relative">
+        <h1 class="text-5xl font-display accent mb-2 tracking-tight">
+          Writer's Nexus
+        </h1>
+        <button id="show-config-btn"
+          class="absolute top-0 right-0 p-2 text-secondary hover:text-accent transition-colors">
+          <i data-lucide="settings"></i>
+        </button>
+        <p class="text-secondary text-lg font-light">
+          Il tuo copilota per la scrittura creativa.
+        </p>
+      </div>
+
+      <div id="config-status" class="text-center text-xs p-2 rounded-lg font-mono opacity-80"></div>
+
+      <form id="login-form" class="space-y-5">
+        <div class="space-y-4">
+          <input id="login-email" type="email" placeholder="Email" required
+            class="w-full px-4 py-3 bg-primary/50 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all placeholder:text-gray-500" />
+          <input id="login-password" type="password" placeholder="Password" required
+            class="w-full px-4 py-3 bg-primary/50 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all placeholder:text-gray-500" />
         </div>
+        <button id="login-submit-btn" type="submit"
+          class="w-full text-lg font-bold py-3 bg-accent text-white rounded-lg hover:bg-accent-hover transform hover:scale-[1.02] transition-all duration-200 shadow-lg shadow-accent/20 disabled:opacity-50 disabled:cursor-not-allowed">
+          Accedi
+        </button>
+      </form>
+
+      <div class="text-center space-y-2">
+        <p id="auth-error" class="text-red-400 text-sm h-5 font-medium"></p>
+        <p class="text-secondary text-sm">
+          Non hai un account?
+          <button id="show-register-btn"
+            class="font-semibold text-accent hover:text-accent-hover hover:underline transition-colors ml-1">
+            Registrati
+          </button>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-screen" class="hidden">
+    <!-- Mobile Menu Button -->
+    <button id="mobile-menu-btn"
+      class="md:hidden fixed top-4 right-4 z-50 p-2 bg-secondary rounded-full shadow-lg border border-accent/20 text-accent">
+      <i data-lucide="menu"></i>
+    </button>
+
+    <div class="flex h-screen bg-primary overflow-hidden relative">
+      <!-- Sidebar (Existing) -->
+      <nav id="sidebar"
+        class="w-72 bg-secondary/80 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between transition-transform duration-300 z-40 fixed md:relative h-full -translate-x-full md:translate-x-0 shadow-2xl md:shadow-none">
+        <!-- ... sidebar content ... -->
+        <div class="p-6">
+          <!-- (Keep existing sidebar content unchanged, just referenced here for context) -->
+          <div class="mb-12">
+            <h1 class="text-2xl font-display accent mb-4 flex items-center gap-2">
+              <i data-lucide="feather" class="w-6 h-6"></i> Nexus
+            </h1>
+            <div id="project-selector-container" class="bg-primary/50 p-3 rounded-lg border border-white/5">
+              <p class="text-xs text-secondary uppercase tracking-wider mb-1">
+                Progetto Attivo
+              </p>
+              <p id="current-project-name" class="font-bold text-base text-primary truncate">
+                Nessuno
+              </p>
+            </div>
+          </div>
+          <ul class="space-y-2" id="main-nav">
+            <!-- ... navigation items ... -->
+            <li data-view="dashboard" class="nav-item group">
+              <div
+                class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5 data-[active=true]:bg-accent/10 data-[active=true]:text-accent">
+                <i data-lucide="layout-dashboard"
+                  class="w-5 h-5 mr-3 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                <span class="font-medium">Dashboard</span>
+              </div>
+            </li>
+            <li data-view="ideation" class="nav-item group">
+              <div class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5">
+                <i data-lucide="brain-circuit"
+                  class="w-5 h-5 mr-3 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                <span class="font-medium">Ideazione</span>
+              </div>
+            </li>
+            <li data-view="structure" class="nav-item group">
+              <div class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5">
+                <i data-lucide="waypoints"
+                  class="w-5 h-5 mr-3 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                <span class="font-medium">Struttura</span>
+              </div>
+            </li>
+            <li data-view="writing" class="nav-item group">
+              <div class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5">
+                <i data-lucide="file-pen-line"
+                  class="w-5 h-5 mr-3 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                <span class="font-medium">Scrittura</span>
+              </div>
+            </li>
+            <li data-view="editing" class="nav-item group">
+              <div class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5">
+                <i data-lucide="file-check-2"
+                  class="w-5 h-5 mr-3 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                <span class="font-medium">Editing</span>
+              </div>
+            </li>
+            <li data-view="analysis" class="nav-item group">
+              <div class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-white/5">
+                <i data-lucide="bar-chart-3"
+                  class="w-5 h-5 mr-3 opacity-70 group-hover:opacity-100 transition-opacity"></i>
+                <span class="font-medium">Analisi</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="p-6 bg-black/10 backdrop-blur-sm">
+          <div class="mb-4">
+            <label for="theme-selector"
+              class="block text-xs font-medium text-secondary mb-2 uppercase tracking-wide">Tema</label>
+            <select id="theme-selector"
+              class="w-full px-3 py-2 bg-primary/50 text-sm border border-white/10 rounded-lg focus:outline-none focus:ring-1 focus:ring-accent">
+              <option value="scifi">Fantascienza</option>
+              <option value="fantasy">Fantasy</option>
+              <option value="thriller">Thriller</option>
+              <option value="romance">Romance</option>
+            </select>
+          </div>
+
+          <div class="space-y-1">
+            <button id="sidebar-settings-btn"
+              class="flex items-center w-full p-2 text-sm text-secondary hover:text-primary hover:bg-white/5 rounded-lg transition-colors">
+              <i data-lucide="settings" class="w-4 h-4 mr-3"></i>
+              <span>Impostazioni</span>
+            </button>
+            <button id="open-import-text"
+              class="flex items-center w-full p-2 text-sm text-secondary hover:text-primary hover:bg-white/5 rounded-lg transition-colors">
+              <i data-lucide="download" class="w-4 h-4 mr-3"></i>
+              <span>Importa Testo</span>
+            </button>
+          </div>
+
+          <div id="user-info" class="flex items-center p-3 bg-white/5 rounded-lg mt-4 border border-white/5">
+            <div class="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent mr-3">
+              <i data-lucide="user" class="w-4 h-4"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p id="user-email" class="text-xs font-semibold truncate text-primary"></p>
+              <button id="logout-btn"
+                class="text-[10px] text-secondary hover:text-accent uppercase tracking-wider font-bold">
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Mobile Overlay -->
+      <div id="mobile-overlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm"></div>
+
+      <main class="flex-1 overflow-y-auto relative w-full" id="main-content-area">
+        <!-- Background Gradient -->
         <div
-          id="config-status"
-          class="text-center text-xs p-2 rounded-lg"
-        ></div>
-        <form id="login-form" class="space-y-4">
-          <input
-            id="login-email"
-            type="email"
-            placeholder="Email"
-            required
-            class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-          <input
-            id="login-password"
-            type="password"
-            placeholder="Password"
-            required
-            class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-          <button
-            id="login-submit-btn"
-            type="submit"
-            class="w-full text-lg font-bold py-3 bg-accent text-primary rounded-lg hover:bg-accent-hover transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Accedi
-          </button>
-        </form>
-        <div class="text-center">
-          <p id="auth-error" class="text-red-400 text-sm h-4"></p>
-          <p class="text-secondary text-sm">
-            Non hai un account?
-            <button
-              id="show-register-btn"
-              class="font-semibold accent hover:underline"
-            >
-              Registrati
-            </button>
-          </p>
+          class="absolute inset-0 bg-gradient-to-br from-transparent to-black/30 pointer-events-none fixed h-full w-full z-0">
         </div>
-      </div>
-    </div>
+        <!-- Content Container -->
+        <div id="view-container" class="relative z-10 min-h-full p-6 md:p-10 pb-20 fade-in-section"></div>
+      </main>
 
-    <div id="app-screen" class="hidden">
-      <div class="flex h-screen bg-primary">
-        <nav
-          class="w-64 bg-secondary p-5 flex flex-col justify-between border-r border-accent/20"
-        >
-          <div>
-            <div class="mb-10">
-              <h1 class="text-3xl font-display accent">Writer's Nexus</h1>
-              <div id="project-selector-container">
-                <p class="text-sm text-secondary">Progetto Attivo:</p>
-                <p
-                  id="current-project-name"
-                  class="font-bold text-lg text-primary"
-                >
-                  Nessuno
-                </p>
-              </div>
-            </div>
-            <ul class="space-y-3" id="main-nav">
-              <li
-                data-view="dashboard"
-                class="nav-item flex items-center p-2 rounded-lg cursor-pointer bg-primary"
-              >
-                <i data-lucide="layout-dashboard" class="mr-3 accent"></i
-                ><span class="font-semibold">Dashboard</span>
-              </li>
-              <li
-                data-view="ideation"
-                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
-              >
-                <i data-lucide="brain-circuit" class="mr-3 text-secondary"></i
-                ><span>Ideazione</span>
-              </li>
-              <li
-                data-view="structure"
-                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
-              >
-                <i data-lucide="waypoints" class="mr-3 text-secondary"></i
-                ><span>Struttura</span>
-              </li>
-              <li
-                data-view="writing"
-                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
-              >
-                <i data-lucide="file-pen-line" class="mr-3 text-secondary"></i
-                ><span>Scrittura</span>
-              </li>
-              <li
-                data-view="editing"
-                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
-              >
-                <i data-lucide="file-check-2" class="mr-3 text-secondary"></i
-                ><span>Editing</span>
-              </li>
-              <li
-                data-view="analysis"
-                class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary"
-              >
-                <i data-lucide="bar-chart-3" class="mr-3 text-secondary"></i
-                ><span>Analisi</span>
-              </li>
-            </ul>
+      <!-- Global AI Panel (Right Sidebar) -->
+      <aside id="ai-panel"
+        class="fixed right-0 top-0 h-full w-80 md:w-96 bg-secondary/95 backdrop-blur-xl border-l border-accent/20 transform translate-x-full transition-transform duration-300 z-50 flex flex-col shadow-2xl">
+        <!-- Header -->
+        <div class="p-4 border-b border-white/10 flex items-center justify-between bg-primary/30">
+          <div class="flex items-center gap-2">
+            <i data-lucide="sparkles" class="text-accent w-5 h-5"></i>
+            <h2 class="font-display text-lg tracking-wide">Nexus AI</h2>
           </div>
-          <div>
-            <div class="mb-4">
-              <label
-                for="theme-selector"
-                class="block text-sm font-medium text-secondary mb-1"
-                >Tema Grafico</label
-              >
-              <select
-                id="theme-selector"
-                class="w-full px-3 py-2 bg-primary border border-accent/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="scifi">Fantascienza</option>
-                <option value="fantasy">Fantasy</option>
-                <option value="thriller">Thriller</option>
-                <option value="romance">Romance</option>
-              </select>
-            </div>
-            <button
-              id="sidebar-settings-btn"
-              class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2"
-            >
-              <i data-lucide="settings" class="mr-3 text-secondary"></i>
-              <span class="text-primary">Impostazioni</span>
+          <button id="close-ai-panel" class="p-1 hover:text-accent transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Context Indicator -->
+        <div
+          class="px-4 py-2 bg-accent/5 text-xs text-secondary border-b border-accent/10 flex justify-between items-center">
+          <span id="ai-context-indicator">Contesto: Generale</span>
+          <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Pronto"></span>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="ai-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+          <!-- Messages will appear here -->
+          <div class="p-3 bg-primary/50 rounded-lg rounded-tl-none border border-white/5 text-sm text-secondary">
+            Ciao! Sono il tuo assistente creativo. Come posso aiutarti oggi?
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 border-t border-white/10 bg-primary/30">
+          <div class="relative">
+            <textarea id="ai-chat-input" rows="1"
+              class="w-full bg-primary/50 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-sm focus:outline-none focus:border-accent resize-none custom-scrollbar"
+              placeholder="Chiedi qualcosa..."></textarea>
+            <button id="ai-send-btn"
+              class="absolute right-2 bottom-2 p-1.5 bg-accent text-primary rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <i data-lucide="send" class="w-4 h-4"></i>
             </button>
-            <button
-              id="open-import-text"
-              class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-2"
-            >
-              <i data-lucide="download" class="mr-3 text-secondary"></i>
-              <span class="text-primary">Importa Testo</span>
+          </div>
+          <div class="flex justify-between mt-2">
+            <button id="ai-clear-chat"
+              class="text-[10px] text-secondary hover:text-red-400 transition-colors uppercase tracking-wider">
+              Pulisci
             </button>
-            <button
-              id="open-ai-assistant"
-              class="nav-item flex items-center p-2 rounded-lg cursor-pointer hover:bg-primary w-full text-left mb-4"
-            >
-              <i data-lucide="bot" class="mr-3 text-secondary"></i>
-              <span class="text-primary">Assistente IA</span>
-            </button>
-            <div
-              id="user-info"
-              class="flex items-center p-2 bg-primary rounded-lg"
-            >
-              <i data-lucide="user-circle-2" class="mr-3 accent"></i>
-              <div>
-                <p id="user-email" class="text-sm font-semibold truncate"></p>
-                <button
-                  id="logout-btn"
-                  class="text-xs text-secondary hover:accent"
-                >
-                  Logout
-                </button>
-              </div>
+            <div id="ai-model-label" class="text-[10px] text-secondary opacity-50">
+              Loading...
             </div>
           </div>
-        </nav>
+        </div>
+      </aside>
 
-        <main class="flex-1 p-8 overflow-y-auto" id="main-content-area"></main>
-      </div>
+      <!-- AI Toggle FAB -->
+      <button id="ai-toggle-btn"
+        class="fixed bottom-8 right-8 z-40 bg-accent text-primary p-4 rounded-full shadow-lg shadow-accent/20 hover:scale-110 active:scale-95 transition-all duration-300 group">
+        <i data-lucide="sparkles" class="w-6 h-6 group-hover:rotate-12 transition-transform"></i>
+      </button>
     </div>
+  </div>
 
-    <div id="modal-container"></div>
+  <div id="modal-container"></div>
 
-    <script type="module" src="main.js"></script>
-  </body>
+  <!-- Chart.js for Analysis -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+
 </html>

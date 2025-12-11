@@ -100,6 +100,34 @@ function toggleTagFilter(category, value) {
   }
   populateTagFilters(); // Update UI of filter tags
   loadCharacters(); // Re-render characters with new filter
+
+  // Handle AI Insertion
+  window.addEventListener('ai-action-insert', async (e) => {
+    // Only verify if we are in Ideation view (container visible)
+    const container = document.getElementById('view-ideation');
+    if (!container || container.classList.contains('hidden')) return;
+
+    // Only accept if context matches
+    if (e.detail && e.detail.text) {
+      try {
+        await DataManager.saveProjectItem(currentProjectId, 'ideas', {
+          content: e.detail.text,
+          createdAt: new Date().toISOString()
+        });
+
+        // Switch to ideas tab and reload
+        // Find button for ideas-ai tab
+        const ideasBtn = document.querySelector('.ideation-tab-btn[data-tab="ideas-ai"]');
+        if (ideasBtn) ideasBtn.click();
+        else loadIdeas(); // Fallback
+
+        // Toast feedback?
+        if (window.toast) window.toast.success('Idea creata dall\'IA');
+      } catch (err) {
+        console.error('Failed to insert AI idea', err);
+      }
+    }
+  });
 }
 // --------------------------------------
 
@@ -179,64 +207,6 @@ async function loadIdeas() {
     ideasListEl.appendChild(ideaEl);
   });
   lucide.createIcons();
-}
-
-async function generateIdeasShortcut() {
-  const submitBtn = document.getElementById('gemini-submit');
-  const responseEl = document.getElementById('gemini-response');
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Generazione...';
-  responseEl.innerHTML =
-    '<div class="flex items-center justify-center p-4"><i data-lucide="loader" class="animate-spin"></i><span class="ml-2">L\'IA sta pensando...</span></div>';
-  lucide.createIcons();
-
-  try {
-    const project = await DataManager.getProject(currentProjectId);
-    const premise = project?.premise;
-
-    if (!premise) {
-      responseEl.textContent =
-        'Errore: La premessa del progetto non è stata trovata. Aggiungila nella Dashboard.';
-      return;
-    }
-
-    const prompt = `Basandoti sulla seguente premessa, genera 3 idee distinte e concise per una storia. Ogni idea dovrebbe essere un singolo paragrafo. Formatta l'output in questo modo: numera ogni idea e separala con '---'. Esempio: 1. [Idea 1] --- 2. [Idea 2] --- 3. [Idea 3]\n\nPremessa: "${premise}"`;
-
-    const aiResponse = await AIService.complete({ prompt });
-    const ideasText = aiResponse.text;
-
-    const ideas = ideasText
-      .split('---')
-      .map(idea => idea.replace(/^\d+\.\s*/, '').trim())
-      .filter(Boolean);
-
-    if (ideas.length === 0) {
-      responseEl.textContent =
-        "L'IA non ha generato idee valide. Prova a riformulare la premessa.";
-      return;
-    }
-
-    // Mostra solo le idee generate senza salvarle automaticamente
-    responseEl.innerHTML = ideas
-      .map(
-        (idea, index) =>
-          `<div class="p-2 my-1 bg-primary rounded"><b>${index + 1}.</b> ${idea}</div>`
-      )
-      .join('');
-
-    // Mostra il bottone per salvare la risposta come idea
-    const saveBtn = document.getElementById('save-gemini-response-btn');
-    if (saveBtn) {
-      saveBtn.classList.remove('hidden');
-    }
-  } catch (error) {
-    console.error('Error generating ideas:', error);
-    responseEl.textContent = `Si è verificato un errore: ${error.message}`;
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "Interroga l'IA";
-  }
 }
 
 async function loadCharacters() {
@@ -373,7 +343,7 @@ async function loadCharacters() {
         if (isInimicizia) {
           // Precarica il sample al primo click se non ancora caricato
           if (!swordBuffer) {
-            loadSwordSample().catch(() => {});
+            loadSwordSample().catch(() => { });
           }
           playSwordClash();
           // Visual: spade incrociate al punto di click
@@ -397,7 +367,7 @@ async function loadCharacters() {
         } else if (isAmore) {
           // Precarica il sample al primo click se non ancora caricato
           if (!heartBuffer) {
-            loadHeartSample().catch(() => {});
+            loadHeartSample().catch(() => { });
           }
           playHeartbeat();
           // Visual: cuore che si espande al punto di click
@@ -432,7 +402,7 @@ function ensureAudioContext() {
   }
   if (audioCtx && audioCtx.state === 'suspended') {
     // Prova a sbloccare l'audio in seguito a gesture dell'utente
-    audioCtx.resume().catch(() => {});
+    audioCtx.resume().catch(() => { });
   }
 }
 
@@ -441,7 +411,7 @@ function playSwordClash() {
   ensureAudioContext();
   if (!audioCtx) return;
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
+    audioCtx.resume().catch(() => { });
   }
 
   if (swordBuffer) {
@@ -495,7 +465,7 @@ function playHeartbeat() {
   ensureAudioContext();
   if (!audioCtx) return;
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
+    audioCtx.resume().catch(() => { });
   }
 
   if (heartBuffer) {
@@ -756,9 +726,7 @@ export default {
     });
 
     // Button event listeners
-    document
-      .getElementById('gemini-submit')
-      .addEventListener('click', generateIdeasShortcut);
+
     document
       .getElementById('new-character-btn')
       .addEventListener('click', handleNewCharacterClick);
@@ -825,16 +793,75 @@ export default {
       preloadedSword = true;
       try {
         await loadSwordSample('assets/sword.mp3');
-      } catch {}
+      } catch { }
       try {
         await loadHeartSample('assets/battito.mp3');
-      } catch {}
+      } catch { }
       document.removeEventListener('pointerdown', preloadAudioOnGesture);
-      document.removeEventListener('keydown', preloadAudioOnGesture);
     };
     document.addEventListener('pointerdown', preloadAudioOnGesture, {
       once: true,
     });
     document.addEventListener('keydown', preloadAudioOnGesture, { once: true });
+
+    // Consistency Alerts Listener (Ideation View Specific)
+    // Helper function to render issues
+    const renderConsistencyIssues = (allIssues) => {
+      const container = document.getElementById('view-ideation');
+      if (!container || !currentProjectId) return;
+
+      // Filter issues for THIS project
+      const issues = (allIssues || []).filter(i => i.projectId === currentProjectId);
+
+      const alertContainer = document.getElementById('ideation-alerts');
+      const alertList = document.getElementById('ideation-alerts-list');
+
+      if (!alertContainer || !alertList) return;
+
+      if (issues.length === 0) {
+        alertContainer.classList.add('hidden');
+        return;
+      }
+
+      alertContainer.classList.remove('hidden');
+      alertList.innerHTML = '';
+
+      issues.slice(0, 3).forEach(issue => {
+        const el = document.createElement('div');
+        el.className = `p-3 rounded-lg border ${issue.severity === 'warning' ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-blue-500/10 border-blue-500/30'} flex items-start gap-3`;
+        el.innerHTML = `
+                 <i data-lucide="${issue.severity === 'warning' ? 'alert-triangle' : 'sparkles'}" class="${issue.severity === 'warning' ? 'text-yellow-400' : 'text-blue-400'} w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                 <div class="flex-1">
+                     <p class="text-sm font-medium text-primary">${issue.message}</p>
+                     ${issue.type === 'ghost_character' ?
+            `<button class="mt-2 text-xs bg-accent/20 hover:bg-accent/40 text-accent px-2 py-1 rounded" onclick="window.resolveEntityIssue('${issue.data.name}', '${issue.data.type}')">Registra ${issue.data.type || 'Entità'}</button>` : ''}
+                 </div>
+             `;
+        alertList.appendChild(el);
+      });
+      if (window.lucide) window.lucide.createIcons();
+    };
+
+    // Helper for resolving issues
+    window.resolveEntityIssue = async (name, type) => {
+      // Map AI type to internal modal type
+      let modalType = 'character';
+      const t = (type || '').toLowerCase();
+      if (t.includes('luogo') || t.includes('location')) modalType = 'location';
+      else if (t.includes('oggetto') || t.includes('object')) modalType = 'object';
+      else if (t.includes('sistema') || t.includes('system')) modalType = 'system';
+
+      const modal = await loadModal(modalType);
+      modal.open({ name });
+    };
+
+    // Immediate check if engine already ran
+    if (window.consistencyEngine && window.consistencyEngine.issues) {
+      renderConsistencyIssues(window.consistencyEngine.issues);
+    }
+
+    window.addEventListener('consistency-issues-updated', e => {
+      renderConsistencyIssues(e.detail.issues);
+    });
   },
 };

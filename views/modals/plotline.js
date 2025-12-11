@@ -11,6 +11,7 @@ let modal,
   statusEl,
   loglineEl,
   descriptionEl,
+  keywordsEl,
   beatsEl;
 let saveBtn, cancelBtn, newBtn, addBeatBtn, deleteBtn;
 let lastFocused = null;
@@ -139,6 +140,7 @@ function newPlotline() {
     status: 'active',
     logline: '',
     description: '',
+    keywords: [],
     beats: [],
   });
 }
@@ -151,6 +153,7 @@ function fillForm(pl) {
   statusEl.value = pl.status || 'active';
   loglineEl.value = pl.logline || '';
   descriptionEl.value = pl.description || '';
+  keywordsEl.value = (pl.keywords || []).join(', ');
   beatsEl.innerHTML = '';
   (pl.beats || []).forEach(b => {
     const wrapper = document.createElement('div');
@@ -195,6 +198,10 @@ async function save() {
     status: statusEl.value,
     logline: loglineEl.value.trim(),
     description: descriptionEl.value.trim(),
+    keywords: keywordsEl.value
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean),
     beats: collectBeats(),
   };
   const saved = await DataManager.saveProjectItem(
@@ -242,6 +249,7 @@ function init() {
   statusEl = document.getElementById('pl-status');
   loglineEl = document.getElementById('pl-logline');
   descriptionEl = document.getElementById('pl-description');
+  keywordsEl = document.getElementById('pl-keywords');
   beatsEl = document.getElementById('pl-beats');
   saveBtn = document.getElementById('pl-save-btn');
   cancelBtn = document.getElementById('pl-cancel-btn');

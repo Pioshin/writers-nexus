@@ -39,12 +39,19 @@ async function renderAnalysis() {
         ? Math.round((covered / totalBeats) * 100)
         : 0;
       const div = document.createElement('div');
-      div.className = 'bg-primary p-3 rounded border border-accent/20';
-      div.innerHTML = `<div class="font-semibold text-primary flex items-center justify-between">
-                <span>${pl.name}</span>
-                <span class="text-xs text-secondary">Copertura beats: ${covered}/${totalBeats} (${coverage}%)</span>
+      div.className =
+        'bg-primary/50 p-4 rounded-lg border border-white/5 hover:bg-primary transition-colors';
+      div.innerHTML = `<div class="font-semibold text-primary flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full" style="background-color: ${pl.color || '#22d3ee'}"></span>
+                    <span>${pl.name}</span>
+                </div>
+                <span class="text-[10px] uppercase tracking-wider bg-secondary/50 px-2 py-0.5 rounded text-accent">Copertura: ${coverage}%</span>
             </div>
-            <div class="text-xs text-secondary mt-1">${pl.description || ''}</div>`;
+            <div class="text-sm text-secondary mb-2">${pl.description || ''}</div>
+            <div class="w-full bg-secondary/50 rounded-full h-1.5 mt-2">
+                <div class="bg-accent h-1.5 rounded-full" style="width: ${coverage}%"></div>
+            </div>`;
       plList.appendChild(div);
     });
   }
@@ -142,114 +149,102 @@ async function renderAnalysis() {
         b.scenesWithMention - a.scenesWithMention
     );
 
-  rows.forEach(({ c, mentions, scenesWithMention }) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-            <td class="py-2 pr-2">${c.name}</td>
-            <td class="py-2 pr-2">${mentions}</td>
-            <td class="py-2 pr-2">${scenesWithMention}</td>
-            <td class="py-2 pr-2">${c.narrativeRole || c.role || ''}</td>
-            <td class="py-2 pr-2">${c.archetype || ''}</td>`;
-    cbody.appendChild(tr);
-  });
+  // --- CHART.JS INTEGRAZIONE ---
 
-  // Character distribution pie (share of mentions)
-  try {
-    const total = rows.reduce((a, b) => a + b.mentions, 0) || 1;
-    const labels = rows.map(r => r.c.name);
-    const dataVals = rows.map(r => Math.round((r.mentions / total) * 100));
-    const ctx = document.getElementById('character-pie').getContext('2d');
-    charts.pie?.destroy?.();
-    charts.pie = new Chart(ctx, {
-      type: 'pie',
+  // 1. Pacing Chart (Parole per Scena)
+  const pacingCtx = document.getElementById('pacing-chart')?.getContext('2d');
+  if (pacingCtx) {
+    if (charts.pacing) charts.pacing.destroy();
+
+    const sceneLabels = orderedScenes.map(s => s.title || `Scena ${s.order}`);
+    const wordCounts = orderedScenes.map(s => wordsCount(s.content));
+
+    charts.pacing = new Chart(pacingCtx, {
+      type: 'bar',
       data: {
-        labels,
-        datasets: [
-          {
-            data: dataVals,
-            backgroundColor: [
-              '#22d3ee',
-              '#a78bfa',
-              '#34d399',
-              '#fbbf24',
-              '#f472b6',
-              '#60a5fa',
-              '#f87171',
-              '#94a3b8',
-            ],
-          },
-        ],
-      },
-      options: { plugins: { legend: { position: 'bottom' } } },
-    });
-  } catch {}
-
-  // Scene metrics
-  const sbody = document.getElementById('scene-metrics-body');
-  sbody.innerHTML = '';
-  scenes
-    .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .forEach(s => {
-      const wc = wordsCount(s.content);
-      const pace = wc < 200 ? 'Veloce' : wc < 500 ? 'Medio' : 'Lento';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-            <td class="py-2 pr-2">${s.title || 'Scena'}</td>
-            <td class="py-2 pr-2">${wc}</td>
-            <td class="py-2 pr-2">${pace}</td>`;
-      sbody.appendChild(tr);
-    });
-
-  // Hero Journey gauge: posizione percentuale lungo gli stadi
-  try {
-    const stageOrder = [
-      'ordinary_world',
-      'call_to_adventure',
-      'refusal_of_call',
-      'meeting_mentor',
-      'crossing_threshold',
-      'tests_allies_enemies',
-      'inmost_cave',
-      'ordeal',
-      'reward',
-      'road_back',
-      'resurrection',
-      'return_with_elixir',
-    ];
-    const stageSeen = new Set(
-      (scenes || []).map(s => s.stageKey).filter(Boolean)
-    );
-    let idx = 0;
-    for (let i = stageOrder.length - 1; i >= 0; i--) {
-      if (stageSeen.has(stageOrder[i])) {
-        idx = i;
-        break;
-      }
-    }
-    const progress = Math.round(((idx + 1) / stageOrder.length) * 100);
-    const ctxHero = document.getElementById('hero-gauge').getContext('2d');
-    charts.hero?.destroy?.();
-    charts.hero = new Chart(ctxHero, {
-      type: 'doughnut',
-      data: {
-        labels: ['Progresso', 'Resto'],
-        datasets: [
-          {
-            data: [progress, 100 - progress],
-            backgroundColor: ['#22d3ee', '#1f2937'],
-          },
-        ],
+        labels: sceneLabels,
+        datasets: [{
+          label: 'Conteggio Parole',
+          data: wordCounts,
+          backgroundColor: wordCounts.map(wc => wc > 1500 ? '#f87171' : wc > 800 ? '#fbbf24' : '#22d3ee'),
+          borderRadius: 4
+        }]
       },
       options: {
-        circumference: 180,
-        rotation: -90,
-        cutout: '70%',
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      },
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Ritmo (Lunghezza Scene)', color: '#94a3b8' }
+        },
+        scales: {
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8' }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 }
+          }
+        }
+      }
     });
-    const legend = document.getElementById('hero-gauge-legend');
-    legend.innerHTML = `<span class="text-secondary">Stadio corrente:</span> <span class="font-semibold">${stageOrder[idx]}</span> — ${progress}%`;
-  } catch {}
+  }
+
+  // 2. Character Presence (Line Chart over Scenes)
+  const charCtx = document.getElementById('characters-chart')?.getContext('2d');
+  if (charCtx) {
+    if (charts.presence) charts.presence.destroy();
+
+    // Top 5 characters by mentions
+    const topChars = rows.slice(0, 5).map(r => r.c);
+    const datasets = topChars.map((char, i) => {
+      const pats = buildPatterns(char.name, char.aliases);
+      const data = sceneTexts.map(txt => {
+        let count = 0;
+        pats.forEach(rx => { const m = txt.match(rx); if (m) count += m.length; });
+        return count;
+      });
+      const colors = ['#22d3ee', '#a78bfa', '#34d399', '#f472b6', '#fbbf24'];
+      return {
+        label: char.name,
+        data: data,
+        borderColor: colors[i % colors.length],
+        backgroundColor: colors[i % colors.length] + '20',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 2
+      };
+    });
+
+    charts.presence = new Chart(charCtx, {
+      type: 'line',
+      data: {
+        labels: orderedScenes.map((s, i) => `Sc. ${i + 1}`),
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#cbd5e1' } },
+          title: { display: true, text: 'Presenza Personaggi per Scena', color: '#94a3b8' }
+        },
+        scales: {
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8' }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#94a3b8' }
+          }
+        }
+      }
+    });
+  }
+
 
   // Sequenza temporale non vincolante: rileva regressioni di stadio rispetto all'ordine delle scene
   try {
@@ -377,7 +372,7 @@ async function renderAnalysis() {
 
     seqEl.innerHTML = '';
     seqEl.appendChild(container);
-  } catch {}
+  } catch { }
 
   // Plotlines matrix (scene vs plotline presence by keyword)
   try {
@@ -387,30 +382,54 @@ async function renderAnalysis() {
       matrixEl.innerHTML = '<p class="text-secondary">Dati insufficienti.</p>';
     } else {
       const tbl = document.createElement('table');
-      tbl.className = 'w-full text-xs';
+      tbl.className = 'w-full text-xs border-collapse';
       const thead = document.createElement('thead');
-      thead.innerHTML = `<tr class="text-secondary border-b border-accent/20"><th class="text-left p-2">Scena</th>${plotlines.map(pl => `<th class="text-left p-2">${pl.name}</th>`).join('')}</tr>`;
+      thead.innerHTML = `<tr class="text-secondary border-b border-accent/20">
+          <th class="text-left p-3 font-medium bg-secondary/50 sticky left-0 z-10 backdrop-blur-sm">Scena</th>
+          ${plotlines.map(pl => `<th class="text-center p-3 font-medium min-w-[100px]" style="color:${pl.color}">${pl.name}</th>`).join('')}
+      </tr>`;
       tbl.appendChild(thead);
       const tbody = document.createElement('tbody');
-      const pls = plotlines.map(pl => ({
-        name: pl.name,
-        rx: new RegExp(pl.name.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i'),
-      }));
+
+      // Extended Plotline Detection with Keywords
+      const pls = plotlines.map(pl => {
+        const terms = [pl.name, ...(pl.keywords || [])].filter(Boolean);
+        // Create regex that matches any of the terms as whole words
+        // sort by length desc to match longest first
+        const sortedTerms = terms.sort((a, b) => b.length - a.length);
+        const pattern = sortedTerms
+          .map(t => t.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'))
+          .join('|');
+        return {
+          name: pl.name,
+          rx: new RegExp(pattern ? `\\b(${pattern})\\b` : pl.name, 'i'),
+          color: pl.color,
+        };
+      });
+
       scenes.forEach((s, i) => {
         const row = document.createElement('tr');
+        row.className =
+          'border-b border-white/5 hover:bg-white/5 transition-colors';
         const text = `${s.title || ''} ${s.content || ''}`;
+
         const tds = pls.map(pl =>
-          pls.length > 20 ? '' : pl.rx.test(text) ? '●' : ''
+          pl.rx.test(text)
+            ? `<div class="w-3 h-3 rounded-full mx-auto shadow-[0_0_8px] shadow-current" style="background-color:${pl.color}; color:${pl.color}"></div>`
+            : '<span class="text-white/10 text-[10px]">•</span>'
         );
+
         row.innerHTML =
-          `<td class="p-2 whitespace-nowrap">${s.title || 'Scena ' + (i + 1)}</td>` +
-          tds.map(v => `<td class="p-2 text-center">${v}</td>`).join('');
+          `<td class="p-3 whitespace-nowrap font-medium text-primary sticky left-0 bg-secondary/30 backdrop-blur-sm border-r border-white/5">${s.title || 'Scena ' + (i + 1)}</td>` +
+          tds
+            .map(v => `<td class="p-3 text-center align-middle">${v}</td>`)
+            .join('');
         tbody.appendChild(row);
       });
       tbl.appendChild(tbody);
       matrixEl.appendChild(tbl);
     }
-  } catch {}
+  } catch { }
 
   // Style profile (if saved into project settings in the future)
   const styleEl = document.getElementById('style-profile');
