@@ -46,6 +46,14 @@ function getHeaders() {
   return headers;
 }
 
+function initGenAI() {
+  if (config.apiKey) {
+    genAI = new GoogleGenerativeAI(config.apiKey);
+  } else {
+    console.warn('[AIService] No API Key for Gemini. Init skipped.');
+  }
+}
+
 export const AIService = {
   init(opts = {}) {
     config = { ...config, ...opts };
@@ -56,6 +64,7 @@ export const AIService = {
       // The client gets the API key from the environment variable `GEMINI_API_KEY` if not passed directly.
       genAI = new GoogleGenerativeAI(config.apiKey);
     }
+    initGenAI(); // Initialize genAI client on init
   },
   getConfig() {
     return { ...config };
@@ -79,11 +88,24 @@ export const AIService = {
 
       try {
         const model = genAI.getGenerativeModel({
-          model: modelName,
-          ...(system ? { systemInstruction: system } : {}),
+          model: normalizeGoogleModel(config.model), // Use normalizeGoogleModel directly
+          ...(system ? { systemInstruction: system } : {}), // Keep system instruction for complete
         });
 
-        const result = await model.generateContent(prompt, {
+        // Gemini Multimodal input
+        let promptInput = [];
+        promptInput.push(prompt); // The 'prompt' argument is the user's text
+
+        if (inlineData) {
+          promptInput.push({
+            inlineData: {
+              data: inlineData.data,
+              mimeType: inlineData.mimeType
+            }
+          });
+        }
+
+        const result = await model.generateContent(promptInput, {
           generationConfig: {
             temperature,
             maxOutputTokens: maxTokens,
@@ -95,7 +117,7 @@ export const AIService = {
         const text = response.text();
         return { text, raw: response };
       } catch (error) {
-        console.error(`[Gemini] Error with model ${modelName}:`, error);
+        console.error(`[Gemini] Complete Error:`, error); // Updated error message
         throw error;
       }
     }
@@ -147,12 +169,17 @@ export const AIService = {
     }
     return { text, raw: data };
   },
-  async chat({ messages, temperature = 0.7, maxTokens = 800 }) {
+  async chat({ messages, temperature = 0.7, maxTokens = 800, inlineData = null }) {
     controller = new AbortController();
 
     if (config.provider === 'google') {
-      if (!genAI)
+      // Attempt to initialize genAI if it's null and model is Gemini/Flash
+      if (!genAI && (config.model.includes('gemini') || config.model.includes('flash'))) {
+        initGenAI();
+      }
+      if (!genAI) {
         throw new Error('Google AI not initialized. Call init first.');
+      }
       const modelName = normalizeGoogleModel(config.model);
       console.debug(
         `[Gemini Chat] Original model: ${config.model} → Normalized: ${modelName}, messages: ${messages.length}`

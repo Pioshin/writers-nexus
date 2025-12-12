@@ -14,46 +14,65 @@
 
 /* DEFAULT (Premium Dark / SciFi) */
 [data-theme='scifi'] {
-  --bg-primary: #0f172a; /* Slate 900 */
-  --bg-secondary: #1e293b; /* Slate 800 */
-  --bg-tertiary: #334155; /* Slate 700 */
-  --text-primary: #f8fafc; /* Slate 50 */
-  --text-secondary: #94a3b8; /* Slate 400 */
-  --accent: #38bdf8; /* Sky 400 */
+  --bg-primary: #0f172a;
+  /* Slate 900 */
+  --bg-secondary: #1e293b;
+  /* Slate 800 */
+  --bg-tertiary: #334155;
+  /* Slate 700 */
+  --text-primary: #f8fafc;
+  /* Slate 50 */
+  --text-secondary: #94a3b8;
+  /* Slate 400 */
+  --accent: #38bdf8;
+  /* Sky 400 */
   --accent-glow: rgb(56 189 248 / 50%);
-  --accent-hover: #0ea5e9; /* Sky 500 */
+  --accent-hover: #0ea5e9;
+  /* Sky 500 */
   --border-color: rgb(148 163 184 / 10%);
-  --surface-gradient: linear-gradient(
-    135deg,
-    rgb(30 41 59 / 100%),
-    rgb(15 23 42 / 100%)
-  );
+  --surface-gradient: linear-gradient(135deg,
+      rgb(30 41 59 / 100%),
+      rgb(15 23 42 / 100%));
 }
 
 /* FANTASY (Warm / Parchment) */
 [data-theme='fantasy'] {
-  --bg-primary: #292524; /* Stone 800 */
-  --bg-secondary: #44403c; /* Stone 700 */
-  --bg-tertiary: #57534e; /* Stone 600 */
-  --text-primary: #f5f5f4; /* Stone 100 */
-  --text-secondary: #a8a29e; /* Stone 400 */
-  --accent: #fbbf24; /* Amber 400 */
+  --bg-primary: #292524;
+  /* Stone 800 */
+  --bg-secondary: #44403c;
+  /* Stone 700 */
+  --bg-tertiary: #57534e;
+  /* Stone 600 */
+  --text-primary: #f5f5f4;
+  /* Stone 100 */
+  --text-secondary: #a8a29e;
+  /* Stone 400 */
+  --accent: #fbbf24;
+  /* Amber 400 */
   --accent-glow: rgb(251 191 36 / 50%);
-  --accent-hover: #f59e0b; /* Amber 500 */
+  --accent-hover: #f59e0b;
+  /* Amber 500 */
   --border-color: rgb(231 229 228 / 10%);
   --font-display: 'MedievalSharp', cursive;
 }
 
 /* ROMANCE (Soft / Elegant) */
 [data-theme='romance'] {
-  --bg-primary: #fff1f2; /* Rose 50 */
-  --bg-secondary: #ffe4e6; /* Rose 100 */
-  --bg-tertiary: #fecdd3; /* Rose 200 */
-  --text-primary: #881337; /* Rose 900 */
-  --text-secondary: #be123c; /* Rose 700 */
-  --accent: #e11d48; /* Rose 600 */
+  --bg-primary: #fff1f2;
+  /* Rose 50 */
+  --bg-secondary: #ffe4e6;
+  /* Rose 100 */
+  --bg-tertiary: #fecdd3;
+  /* Rose 200 */
+  --text-primary: #881337;
+  /* Rose 900 */
+  --text-secondary: #be123c;
+  /* Rose 700 */
+  --accent: #e11d48;
+  /* Rose 600 */
   --accent-glow: rgb(225 29 72 / 30%);
-  --accent-hover: #9f1239; /* Rose 800 */
+  --accent-hover: #9f1239;
+  /* Rose 800 */
   --border-color: rgb(190 18 60 / 10%);
   --font-display: 'Dancing Script', cursive;
 }
@@ -61,13 +80,17 @@
 /* THRILLER (Stark / Contrast) */
 [data-theme='thriller'] {
   --bg-primary: #000;
-  --bg-secondary: #171717; /* Neutral 900 */
-  --bg-tertiary: #262626; /* Neutral 800 */
+  --bg-secondary: #171717;
+  /* Neutral 900 */
+  --bg-tertiary: #262626;
+  /* Neutral 800 */
   --text-primary: #e5e5e5;
   --text-secondary: #a3a3a3;
-  --accent: #ef4444; /* Red 500 */
+  --accent: #ef4444;
+  /* Red 500 */
   --accent-glow: rgb(239 68 68 / 60%);
-  --accent-hover: #dc2626; /* Red 600 */
+  --accent-hover: #dc2626;
+  /* Red 600 */
   --border-color: rgb(255 255 255 / 15%);
   --font-display: 'Special Elite', cursive;
 }
@@ -80,12 +103,17 @@ body {
   font-family: var(--font-main);
   transition:
     background-color 0.4s var(--ease-smooth),
-    color 0.4s var(--ease-smooth);
+    color 0.4s var(--ease-smooth),
+    background-image 0.4s var(--ease-smooth);
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 /* UTILITIES & OVERRIDES */
@@ -187,7 +215,8 @@ textarea:focus {
 /* --- MANUSCRIPT --- */
 .manuscript-body {
   font-family: var(--font-body);
-  font-size: 1.125rem; /* 18px */
+  font-size: 1.125rem;
+  /* 18px */
   line-height: 1.8;
   max-width: 65ch;
   margin: 0 auto;
@@ -354,6 +383,7 @@ textarea:focus {
 
 /* --- ANIMATIONS (Micro-interactions) --- */
 @keyframes pulse-subtle {
+
   0%,
   100% {
     opacity: 100%;

@@ -99,6 +99,23 @@ async function loadProjects() {
         if (updated) loadProjects();
       },
       onDelete: () => openDeleteConfirm(project, card),
+      additionalActions: [
+        {
+          label: 'Export for MemVid (JSON)',
+          icon: 'download',
+          onClick: async () => {
+            const allData = await DataManager.getProjectData(project.id);
+            const jsonStr = JSON.stringify(allData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${project.title || 'project'}_data.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+        }
+      ]
     });
     card.appendChild(cardContent);
     projectsListEl.appendChild(card);

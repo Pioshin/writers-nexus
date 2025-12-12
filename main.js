@@ -204,6 +204,12 @@ async function updateActiveProjectIndicator() {
   if (projectId) {
     const project = await DataManager.getProject(projectId);
     currentProjectNameEl.textContent = project ? project.title : 'Nessuno';
+
+    // Reset and restart Consistency Engine on project switch
+    if (window.consistencyEngine) {
+      window.consistencyEngine.reset();
+      setTimeout(() => window.consistencyEngine.run(), 1000);
+    }
   } else {
     currentProjectNameEl.textContent = 'Nessuno';
   }

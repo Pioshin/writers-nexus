@@ -1,5 +1,6 @@
 import { DataManager } from '../../DataManager.js';
 import { toast } from '../shared/toast.js';
+import { AIService } from '../../ai/AIService.js';
 
 let modal,
   form,
@@ -29,11 +30,49 @@ function init() {
   configGoogleModelSelect = document.getElementById('config-google-model');
   refreshGoogleModelsBtn = document.getElementById('refresh-google-models');
   googleModelsStatusEl = document.getElementById('google-models-status');
+  const testConnectionBtn = document.getElementById('test-connection-btn'); // New
 
   cancelBtn.addEventListener('click', close);
   saveBtn.addEventListener('click', save);
   aiProviderSelect.addEventListener('change', updateAIProviderUI);
   refreshGoogleModelsBtn?.addEventListener('click', loadGoogleModels);
+  testConnectionBtn?.addEventListener('click', testConnection); // New
+}
+
+async function testConnection() {
+  const testBtn = document.getElementById('test-connection-btn');
+  if (testBtn) { testBtn.textContent = 'Testing...'; testBtn.disabled = true; }
+
+  const provider = aiProviderSelect.value;
+  const baseUrl = aiBaseUrlInput.value.replace(/\/$/, ''); // Remove trailing slash
+  const model = aiModelInput.value;
+
+  try {
+    let url;
+    if (provider === 'ollama') {
+      // For Ollama, we can try to list tags or just ping
+      // Standard Ollama endpoint for tags is GET /api/tags
+      // But if user set standard OpenAI-compat URL (v1), we check models there
+      if (baseUrl.includes('/v1')) {
+        url = `${baseUrl}/models`;
+      } else {
+        url = `${baseUrl}/api/tags`; // Direct Ollama
+      }
+    } else {
+      // OpenAI Format
+      url = `${baseUrl}/models`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    toast.success(`Connessione OK! (${provider})`);
+  } catch (e) {
+    console.error("Connection Test Failed:", e);
+    toast.error(`Errore Connessione: ${e.message}. Verifica CORS e URL.`);
+  } finally {
+    if (testBtn) { testBtn.textContent = 'Test Connessione'; testBtn.disabled = false; }
+  }
 }
 
 function updateAIProviderUI() {
@@ -78,7 +117,8 @@ function close() {
   modal.classList.add('hidden');
 }
 
-async function save() {
+async function save(e) {
+  if (e) e.preventDefault();
   const geminiKey = geminiApiKeyInput.value.trim();
   const firebaseConfigStr = firebaseConfigTextarea.value.trim();
   let firebaseConfig;
@@ -113,9 +153,17 @@ async function save() {
     aiApiKey: effectiveAiApiKey,
   });
 
+  // Hot Reload AI Service
+  AIService.init({
+    provider: provider,
+    apiKey: effectiveAiApiKey,
+    baseUrl: aiBaseUrlInput?.value.trim() || '',
+    model: model
+  });
+
   close();
-  toast.success('Configurazione salvata. Ricarico la pagina...');
-  setTimeout(() => location.reload(), 600);
+  toast.success('Configurazione salvata e applicata.');
+  // Removed explicit reload: setTimeout(() => location.reload(), 600);
 }
 
 export default { init, open, close };

@@ -804,41 +804,178 @@ export default {
     });
     document.addEventListener('keydown', preloadAudioOnGesture, { once: true });
 
+    // Force Analysis Button
+    const forceBtn = document.getElementById('force-analysis-btn');
+    if (forceBtn) {
+      forceBtn.onclick = async () => {
+        if (window.consistencyEngine) {
+          const icon = forceBtn.querySelector('i');
+          if (icon) icon.classList.add('animate-spin');
+          forceBtn.disabled = true; // Prevent multiple clicks
+
+          await window.consistencyEngine.forceReanalysis();
+
+          if (icon) icon.classList.remove('animate-spin');
+          forceBtn.disabled = false;
+        }
+      };
+    }
+
+    // MemVid Upload Handler
+    const memvidInput = document.getElementById('memvid-upload');
+    if (memvidInput) {
+      memvidInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (window.consistencyEngine) {
+          // Simple file to base64
+          const reader = new FileReader();
+          reader.onload = async function () {
+            const base64Data = reader.result.split(',')[1];
+            const mimeType = file.type;
+
+            // Trigger Analysis
+            await window.consistencyEngine.analyzeVideoMemory({
+              data: base64Data,
+              mimeType: mimeType,
+              size: file.size
+            });
+
+            // Reset input
+            memvidInput.value = '';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // Consistency Alerts Listener (Ideation View Specific)
     // Consistency Alerts Listener (Ideation View Specific)
     // Helper function to render issues
-    const renderConsistencyIssues = (allIssues) => {
+    const renderConsistencyIssues = (allIssues, aiStatus = 'online') => {
       const container = document.getElementById('view-ideation');
       if (!container || !currentProjectId) return;
 
       // Filter issues for THIS project
       const issues = (allIssues || []).filter(i => i.projectId === currentProjectId);
 
-      const alertContainer = document.getElementById('ideation-alerts');
-      const alertList = document.getElementById('ideation-alerts-list');
+      // --- 1. IDEAS TAB: SUMMARY ONLY ---
+      const summaryContainer = document.getElementById('ideation-alerts');
+      const summaryList = document.getElementById('ideation-alerts-list');
 
-      if (!alertContainer || !alertList) return;
+      if (summaryContainer && summaryList) {
+        const charCount = issues.filter(i => i.type === 'ghost_character' || (i.data?.type && i.data.type.toLowerCase().includes('personaggio'))).length;
+        const wbCount = issues.length - charCount;
 
-      if (issues.length === 0) {
-        alertContainer.classList.add('hidden');
-        return;
+        // Check for Heuristic/Error status
+        const isHeuristic = issues.some(i => i.source === 'heuristic');
+        const isError = aiStatus === 'error';
+        const isNotConfigured = aiStatus === 'not_configured';
+
+        summaryContainer.classList.remove('hidden'); // Always show container to explain status
+        summaryList.innerHTML = '';
+
+        // Status Banner
+        if (isError || isNotConfigured || isHeuristic) {
+          const statusDiv = document.createElement('div');
+          let statusMsg = isHeuristic ? "Modalità Euristica (AI non disponibile o fallita). Risultati approssimativi." : "AI: Stato sconosciuto.";
+          if (isNotConfigured) statusMsg = "AI non configurata. Vai in Impostazioni.";
+          if (isError) statusMsg = "Errore connessione AI. Verifica rete/chiavi.";
+
+          statusDiv.className = 'bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-xs text-yellow-200 mb-2 flex items-center gap-2';
+          statusDiv.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3"></i> ${statusMsg}`;
+          summaryList.appendChild(statusDiv);
+        }
+
+        if (issues.length === 0) {
+          if (!isError && !isNotConfigured) summaryList.innerHTML += `<div class="text-sm text-secondary italic">Nessun problema rilevato.</div>`;
+        } else {
+          // Create Summary Card
+          const div = document.createElement('div');
+          div.className = 'flex flex-col gap-2';
+          div.innerHTML = `
+                    <div class="flex items-center gap-2 text-primary font-medium">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-accent"></i>
+                        <span>Analisi Coerenza Completata</span>
+                    </div>
+                    ${charCount > 0 ? `<div class="text-sm text-secondary bg-white/5 p-2 rounded ml-6 cursor-pointer hover:bg-white/10" onclick="document.querySelector('[data-tab=\\'characters\\']').click()">
+                        Trovati <strong>${charCount}</strong> nuovi Personaggi potenziali. <span class="text-accent underline">Vedi Tab Personaggi</span>
+                    </div>` : ''}
+                    ${wbCount > 0 ? `<div class="text-sm text-secondary bg-white/5 p-2 rounded ml-6 cursor-pointer hover:bg-white/10" onclick="document.querySelector('[data-tab=\\'worldbuilding\\']').click()">
+                        Trovati <strong>${wbCount}</strong> elementi di World Building. <span class="text-accent underline">Vedi Tab World Building</span>
+                    </div>` : ''}
+                `;
+          summaryList.appendChild(div);
+        }
       }
 
-      alertContainer.classList.remove('hidden');
-      alertList.innerHTML = '';
+      // --- 2. CHARACTERS TAB: DETAILED LIST ---
+      const charContainer = document.getElementById('character-alerts');
+      const charList = document.getElementById('character-alerts-list');
+      if (charContainer && charList) {
+        const charIssues = issues.filter(i => i.type === 'ghost_character' || (i.data?.type && i.data.type.toLowerCase().includes('personaggio')));
 
-      issues.slice(0, 3).forEach(issue => {
-        const el = document.createElement('div');
-        el.className = `p-3 rounded-lg border ${issue.severity === 'warning' ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-blue-500/10 border-blue-500/30'} flex items-start gap-3`;
-        el.innerHTML = `
-                 <i data-lucide="${issue.severity === 'warning' ? 'alert-triangle' : 'sparkles'}" class="${issue.severity === 'warning' ? 'text-yellow-400' : 'text-blue-400'} w-4 h-4 mt-0.5 flex-shrink-0"></i>
-                 <div class="flex-1">
-                     <p class="text-sm font-medium text-primary">${issue.message}</p>
-                     ${issue.type === 'ghost_character' ?
-            `<button class="mt-2 text-xs bg-accent/20 hover:bg-accent/40 text-accent px-2 py-1 rounded" onclick="window.resolveEntityIssue('${issue.data.name}', '${issue.data.type}')">Registra ${issue.data.type || 'Entità'}</button>` : ''}
-                 </div>
-             `;
-        alertList.appendChild(el);
-      });
+        if (charIssues.length === 0) {
+          charContainer.classList.add('hidden');
+        } else {
+          charContainer.classList.remove('hidden');
+          charList.innerHTML = '';
+          // Show up to 30 items
+          charIssues.slice(0, 30).forEach(issue => {
+            const el = document.createElement('div');
+            el.className = 'p-3 rounded-lg border bg-blue-500/10 border-blue-500/30 flex items-center justify-between gap-3';
+            el.innerHTML = `
+                         <div class="flex items-center gap-3">
+                             <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs">AI</div>
+                             <div>
+                                 <p class="text-sm font-medium text-primary">${issue.data.name}</p>
+                                 <p class="text-xs text-secondary">Rilevato in ${issue.data.count || 1} scene</p>
+                             </div>
+                         </div>
+                         <button class="text-xs bg-accent/20 hover:bg-accent/40 text-accent px-3 py-1.5 rounded transition-colors" 
+                             onclick="window.resolveEntityIssue('${issue.data.name.replace(/'/g, "\\'")}', '${issue.data.type}')">
+                             Registra
+                         </button>
+                     `;
+            charList.appendChild(el);
+          });
+        }
+      }
+
+      // --- 3. WORLD BUILDING TAB: DETAILED LIST ---
+      const wbContainer = document.getElementById('world-alerts');
+      const wbList = document.getElementById('world-alerts-list');
+      if (wbContainer && wbList) {
+        // Filter for NOT characters (Locations, Objects, Systems)
+        const wbIssues = issues.filter(i => !(i.type === 'ghost_character' || (i.data?.type && i.data.type.toLowerCase().includes('personaggio'))));
+
+        if (wbIssues.length === 0) {
+          wbContainer.classList.add('hidden');
+        } else {
+          wbContainer.classList.remove('hidden');
+          wbList.innerHTML = '';
+          wbIssues.slice(0, 30).forEach(issue => {
+            const el = document.createElement('div');
+            el.className = 'p-3 rounded-lg border bg-purple-500/10 border-purple-500/30 flex items-center justify-between gap-3';
+            el.innerHTML = `
+                         <div class="flex items-center gap-3">
+                             <div class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold text-xs">AI</div>
+                             <div>
+                                 <p class="text-sm font-medium text-primary">${issue.data.name}</p>
+                                 <p class="text-xs text-secondary capitalize">${issue.data.type || 'Oggetto'}</p>
+                             </div>
+                         </div>
+                         <button class="text-xs bg-accent/20 hover:bg-accent/40 text-accent px-3 py-1.5 rounded transition-colors" 
+                             onclick="window.resolveEntityIssue('${issue.data.name.replace(/'/g, "\\'")}', '${issue.data.type}')">
+                             Registra
+                         </button>
+                     `;
+            wbList.appendChild(el);
+          });
+        }
+      }
+
       if (window.lucide) window.lucide.createIcons();
     };
 
@@ -847,12 +984,22 @@ export default {
       // Map AI type to internal modal type
       let modalType = 'character';
       const t = (type || '').toLowerCase();
-      if (t.includes('luogo') || t.includes('location')) modalType = 'location';
-      else if (t.includes('oggetto') || t.includes('object')) modalType = 'object';
-      else if (t.includes('sistema') || t.includes('system')) modalType = 'system';
 
-      const modal = await loadModal(modalType);
-      modal.open({ name });
+      if (t.includes('personaggio')) modalType = 'character';
+      else if (t.includes('luogo') || t.includes('location')) modalType = 'location';
+      else if (t.includes('oggetto') || t.includes('object')) modalType = 'object';
+      else if (t.includes('sistema') || t.includes('system') || t.includes('organizzazione')) modalType = 'system';
+      else if (t.includes('società') || t.includes('society') || t.includes('religione') || t.includes('politica') || t.includes('cultura')) modalType = 'culture';
+
+      // Fallback/Safety Check - if mapped to culture but we want variety? 
+      // Actually 'culture' modal handles culture/society/religion well.
+
+      try {
+        const modal = await loadModal(modalType);
+        modal.open({ name }); // Pre-fill name
+      } catch (e) {
+        console.error("Failed to load modal:", e);
+      }
     };
 
     // Immediate check if engine already ran
@@ -861,7 +1008,20 @@ export default {
     }
 
     window.addEventListener('consistency-issues-updated', e => {
-      renderConsistencyIssues(e.detail.issues);
+      renderConsistencyIssues(e.detail.issues, e.detail.aiStatus);
+    });
+
+    // Debug Log Listener
+    window.addEventListener('consistency-log', e => {
+      const logContainer = document.getElementById('debug-log-content');
+      if (logContainer) {
+        const { message, type, timestamp } = e.detail;
+        const color = type === 'error' ? 'text-red-400' : (type === 'success' ? 'text-green-400' : 'text-gray-300');
+        const line = document.createElement('div');
+        line.className = `${color} border-b border-white/5 pb-1`;
+        line.innerHTML = `<span class="opacity-50">[${timestamp}]</span> ${message}`;
+        logContainer.prepend(line); // Newest on top
+      }
     });
   },
 };

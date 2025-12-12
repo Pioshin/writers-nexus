@@ -5,6 +5,8 @@ export class ConsistencyEngine {
         this.aiService = aiService;
         this.issues = [];
         this.isRunning = false;
+        this.aiStatus = 'unknown'; // 'online', 'offline', 'error'
+        this.currentProjectId = null;
         this.rules = [
             this.checkGhostCharacters.bind(this),
             this.checkAbandonedPlotlines.bind(this),
@@ -12,31 +14,48 @@ export class ConsistencyEngine {
         ];
     }
 
+    log(msg, type = 'info') {
+        console.log(`[ConsistencyEngine] ${msg}`);
+        window.dispatchEvent(new CustomEvent('consistency-log', {
+            detail: { message: msg, type, timestamp: new Date().toLocaleTimeString() }
+        }));
+    }
+
+    reset() {
+        this.issues = [];
+        this.isRunning = false;
+        this.currentProjectId = null;
+        this.broadcastIssues();
+        console.log('[ConsistencyEngine] Reset complete.');
+    }
+
     init() {
         // Listen for data changes to re-run checks
-        window.addEventListener('datachanged', () => this.scheduleRun());
+        // window.addEventListener('datachanged', () => this.scheduleRun());
         // Initial run
-        setTimeout(() => this.run(), 2000);
+        // setTimeout(() => this.run(), 2000);
+        console.log('[ConsistencyEngine] Init complete. Auto-run disabled (using Manual/MemVid only).');
     }
 
     scheduleRun() {
-        if (this.debounceTimer) clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => this.run(), 5000); // 5s debounce
+        // if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        // this.debounceTimer = setTimeout(() => this.run(), 5000); // 5s debounce
     }
 
-    async run() {
+    async run(options = {}) {
+        const forceAI = options.forceAI || false;
+
         if (this.isRunning) return;
         this.isRunning = true;
         this.issues = [];
-        console.log('[ConsistencyEngine] Starting audit...');
+        console.log(`[ConsistencyEngine] Starting audit (AI Forced: ${forceAI})...`);
 
         try {
+            // ... existing setup ...
             const projectId = await this.dataManager.getCurrentProjectId();
-            if (!projectId) {
-                this.isRunning = false;
-                return;
-            }
+            // ... 
 
+            // ... fetching logic ...
             const [scenes, characters, locations, objects, systems, plotlines] = await Promise.all([
                 this.dataManager.getProjectItems(projectId, 'scenes'),
                 this.dataManager.getProjectItems(projectId, 'characters'),
@@ -46,14 +65,21 @@ export class ConsistencyEngine {
                 this.dataManager.getProjectItems(projectId, 'plotlines')
             ]);
 
-            const project = await this.dataManager.getProject(projectId); // Fetch project details
+            const project = await this.dataManager.getProject(projectId);
+            // ...
+
             const context = { scenes, characters, locations, objects, systems, plotlines, projectId, projectTitle: project.title };
 
             for (const rule of this.rules) {
-                const ruleIssues = await rule(context);
+                // Pass forceAI to rules
+                const ruleIssues = await rule(context, forceAI);
                 if (ruleIssues && ruleIssues.length) {
-                    // Attach project name to each issue
-                    const enrichedIssues = ruleIssues.map(i => ({ ...i, projectName: project.title, projectId: project.id }));
+                    // ... existing aggregation ...
+                    const enrichedIssues = ruleIssues.map(i => ({
+                        ...i,
+                        projectName: project.title,
+                        projectId: project.id
+                    }));
                     this.issues.push(...enrichedIssues);
                 }
             }
@@ -61,14 +87,64 @@ export class ConsistencyEngine {
             this.broadcastIssues();
         } catch (error) {
             console.error('[ConsistencyEngine] Error during audit:', error);
+            this.aiStatus = 'error';
+            this.broadcastIssues();
         } finally {
             this.isRunning = false;
         }
     }
 
+    /**
+     * Forces a complete re-analysis by clearing cached results for all scenes.
+     */
+    async forceReanalysis() {
+        if (this.isRunning) {
+            this.toast('Analisi già in corso...', 'warning');
+            return;
+        }
+
+        this.toast('Riavvio analisi forzato. Potrebbe richiedere tempo...', 'info');
+        console.log('[ConsistencyEngine] Force Re-analysis triggered.');
+
+        // VISUAL CLEANUP: Clear valid issues immediately
+        this.issues = [];
+        this.broadcastIssues();
+
+        try {
+            const projectId = await this.dataManager.getCurrentProjectId();
+            if (!projectId) return;
+
+            // 1. Clear cache for ALL scenes
+            const scenes = await this.dataManager.getProjectItems(projectId, 'scenes');
+            // We need to update them one by one or batch. DataManager might not have batch update.
+            // Let's assume we iterate and save.
+            const updates = scenes.map(scene => {
+                scene.extractedEntities = null; // Clear entities
+                scene.contentHash = null;       // Clear hash to force re-scan
+                return this.dataManager.saveScene(scene);
+            });
+
+            await Promise.all(updates);
+            console.log('[ConsistencyEngine] Cache cleared. Restarting run...');
+
+            // 2. Run immediately
+            await this.run({ forceAI: true });
+            this.toast('Analisi completata!', 'success');
+
+        } catch (e) {
+            console.error('[ConsistencyEngine] Force run failed:', e);
+            this.toast('Errore durante il riavvio dell\'analisi', 'error');
+        }
+    }
+
     broadcastIssues() {
-        console.log('[ConsistencyEngine] Audit complete. Issues:', this.issues.length);
-        const event = new CustomEvent('consistency-issues-updated', { detail: { issues: this.issues } });
+        console.log(`[ConsistencyEngine] Audit complete. Issues: ${this.issues.length} | AI Status: ${this.aiStatus}`);
+        const event = new CustomEvent('consistency-issues-updated', {
+            detail: {
+                issues: this.issues,
+                aiStatus: this.aiStatus
+            }
+        });
         window.dispatchEvent(event);
 
         // Update UI Badge directly if existing
@@ -85,7 +161,7 @@ export class ConsistencyEngine {
 
     // --- RULES ---
 
-    async checkGhostCharacters(context) {
+    async checkGhostCharacters(context, forceAI = false) {
         const issues = [];
         const { scenes, characters, locations, objects, systems } = context;
 
@@ -97,40 +173,67 @@ export class ConsistencyEngine {
             ...systems.map(s => s.name.toLowerCase())
         ]);
 
-        // 2. Iterate scenes and perform AI Analysis if needed
-        for (const scene of scenes) {
+        // 2. Iterate scenes
+        let aiConfigured = false;
+        try {
+            // We check settings but we ONLY run AI if forceAI is true
+            const config = await this.dataManager.getSettings();
+            if (config.aiApiKey || config.geminiKey || config.openaiKey) aiConfigured = true;
+        } catch (e) { }
+
+        for (const scene of context.scenes) {
             if (!scene.content || scene.content.length < 50) continue;
 
+            let entities = scene.extractedEntities;
+            let source = scene.extractionSource;
+
+            // Only re-analyze if content changed OR if we are forcing AI
+            // AND if forceAI is true. If forceAI is false, we try heuristic if no entities exist.
             const sceneHash = this.computeHash(scene.content);
-            let entities = scene.extractedEntities || [];
+            const needsAnalysis = scene.contentHash !== sceneHash || !entities || entities.length === 0;
 
-            // Incremental Check: If hash changed or no entities, Re-Analyze
-            if (scene.contentHash !== sceneHash || !scene.extractedEntities || scene.extractedEntities.length === 0) {
-                try {
-                    console.log(`[Consistency] Analyzing scene "${scene.title}" with AI...`);
-                    entities = await this.analyzeSceneWithAI(scene.content);
+            if (needsAnalysis || (forceAI && source !== 'ai')) {
+                // DEFAULT: HEURISTIC
+                source = 'heuristic';
 
-                    // FALLBACK: If AI returns null (meaning it failed or wasn't available), use heuristic
-                    if (entities === null) {
-                        console.warn(`[Consistency] AI unavailable. Falling back to Heuristic for "${scene.title}"`);
+                // AI TRIGGER: Only if explicitly forced AND configured
+                if (forceAI && aiConfigured) {
+                    try {
+                        console.log(`[Consistency] Manual AI Analysis triggered for "${scene.title}"...`);
+                        const result = await this.analyzeSceneWithAI(scene.content, context.projectTitle);
+                        if (result) {
+                            entities = result;
+                            source = 'ai';
+                            // RATE LIMITING: Wait 10 seconds between checks to avoid 429 Google AI errors (Quota: 5/min approx)
+                            // Only wait if we actually called the AI
+                            this.log("Attesa rispetto quota API (5s)...", 'info');
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        } else {
+                            // Fallback if AI returned null (quota/error)
+                            entities = this.analyzeSceneHeuristic(scene.content);
+                        }
+                    } catch (e) {
+                        console.warn("AI Manual Trigger Failed:", e);
                         entities = this.analyzeSceneHeuristic(scene.content);
                     }
-
-                    // Persist results
-                    scene.extractedEntities = entities;
-                    scene.contentHash = sceneHash;
-                    await this.dataManager.saveScene(context.projectId, scene); // Ensure saveScene supports ID or object
-                } catch (err) {
-                    console.warn(`[Consistency] Analysis failed for scene ${scene.title}:`, err);
-                    // Fallback to heuristic on crash
+                } else if (!entities || needsAnalysis) {
+                    // Always fallback to heuristic for automatic runs
+                    // console.log(`[Consistency] Auto-Audit (Heuristic) for "${scene.title}"`);
                     entities = this.analyzeSceneHeuristic(scene.content);
+                }
+
+                if (entities) {
+                    scene.extractedEntities = entities; // Should we store source too? Yes but simplifying for now.
+                    scene.extractionSource = source; // Store source
+                    scene.contentHash = sceneHash;
+                    await this.dataManager.saveScene(scene);
                 }
             }
 
             // 3. Compare extracted entities with known DB
             entities.forEach(entity => {
                 if (!knownNames.has(entity.name.toLowerCase())) {
-                    // Check if already reported for this check run to avoid duplicates across scenes? 
+                    // Check if already reported for this check run to avoid duplicates across scenes?
                     // No, usually we want to know *where* it appears, but for the dashboard summary we might group.
                     // For now, let's just push unique issues per entity name to avoid spamming the user with 50 alerts for "Terrax"
 
@@ -144,6 +247,7 @@ export class ConsistencyEngine {
                             severity: 'info',
                             projectName: context.projectTitle, // Added context
                             projectId: context.projectId,
+                            source: scene.extractionSource || 'unknown',
                             message: `"${entity.name}" rilevato nel testo ma non nel database.`,
                             data: { name: entity.name, type: entity.type || 'Entità', count: 1 }
                         });
@@ -155,37 +259,140 @@ export class ConsistencyEngine {
         return issues;
     }
 
-    async analyzeSceneWithAI(text) {
-        if (!this.aiService) return null; // Signal fallback
+    async analyzeVideoMemory(fileData) {
+        if (!this.aiService) return;
 
-        // Short-circuit if text is too short for AI to be useful
+        this.toast('Analisi MemVid avviata. Potrebbe richiedere 1-2 minuti...', 'info');
+        console.log(`[Consistency] Analyzing MemVid (${(fileData.size / 1024 / 1024).toFixed(2)} MB)...`);
+        this.isRunning = true;
+        this.aiStatus = 'online';
+
+        try {
+            const prompt = `
+            STRUTTURA MANOSCRITTO (MEMVID DECODING):
+            Questo video contiene i dati codificati dell'intero manoscritto.
+            Analizza il contenuto visuale/testuale e estrai TUTTE le Entità Nominate (Personaggi, Luoghi, Oggetti, Sistemi) menzionate nella narrazione.
+
+            FORMATO OUTPUT RICHIESTO (Unico JSON Array):
+            [
+              {"name": "Nome", "type": "Personaggio", "context": "Descrizione breve..."},
+              ...
+            ]
+            `;
+
+            const response = await this.aiService.chat({
+                messages: [
+                    { role: 'user', content: prompt }
+                ],
+                inlineData: {
+                    data: fileData.data,
+                    mimeType: fileData.mimeType
+                },
+                maxTokens: 100000 // High output limit (Flash supports it)
+            });
+
+            const entities = this.parseAIResponse(response);
+            if (entities) {
+                this.log(`Analisi MemVid completata! Trovate ${entities.length} entità.`, 'success');
+                // Here we would ideally merge with DB. For now, create specific "MemVid Issues".
+                // Or better: update all scenes? 
+                // Updating entire project consistency map.
+                this.issues = entities.map(e => ({
+                    type: 'memvid_found',
+                    severity: 'info',
+                    message: `Entità MemVid: ${e.name} (${e.type})`,
+                    data: e
+                }));
+                this.broadcastIssues();
+                this.toast('MemVid analizzato con successo!', 'success');
+            } else {
+                this.log("Nessuna entità trovata nel MemVid.", 'warning');
+                this.toast('Analisi completata ma nessun dato estratto.', 'warning');
+            }
+
+        } catch (e) {
+            console.error("MemVid Error:", e);
+            this.log(`Errore Analisi MemVid: ${e.message}`, 'error');
+            this.toast('Errore analisi video (forse troppo grande?)', 'error');
+        } finally {
+            this.isRunning = false;
+        }
+    }
+
+    async analyzeSceneWithAI(text, projectTitle = '') {
+        if (!this.aiService) return null;
+
+        // Short-circuit if text is too short
         if (text.length < 50) return null;
 
+        this.log(`Analisi scena "${projectTitle ? projectTitle : '...'}" (len: ${text.length}) avviata...`);
         const prompt = `
-        Analizza il seguente testo narrativo ed estrai un elenco JSON delle entità uniche menzionate.
-        Categorie: Personaggio, Luogo, Oggetto, Sistema.
-        Ignora nomi comuni, pronomi (es. "Lui", "Lei") o parole generiche. Estrai solo Nomi Propri rilevanti.
-        Se non trovi nulla, restituisci array vuoto [].
+        TASK: Extract Named Entities from the text below as a JSON Array.
         
-        Output atteso (array JSON puro):
-        [{"name": "Nome", "type": "Personaggio"}, {"name": "Luogo", "type": "Luogo"}]
+        RULES:
+        1. OUTPUT ONLY JSON. NO intro, NO markdown.
+        2. Detect: Person (Personaggio), Place (Luogo), Object (Oggetto), Organization (Sistema).
+        3. IGNORE common words (The, A, Look, After).
+        4. Context matters: "Terrax" acting = Person. "Terrax" visited = Place.
 
-        TESTO:
+        EXAMPLE OUTPUT:
+        [{"name": "Geralt", "type": "Personaggio"}, {"name": "Rivia", "type": "Luogo"}]
+
+        TEXT:
         ${text.substring(0, 4000)} 
         `;
 
         try {
-            const response = await this.aiService.chat([
-                { role: 'system', content: 'Sei un analista letterario esperto in Named Entity Recognition. Rispondi solo con JSON.' },
-                { role: 'user', content: prompt }
-            ], { jsonMode: true });
+            this.log(`Invio richiesta IA...`, 'info');
+            // Use low temp for determinstic JSON
+            // Note: inlineData is NOT used here (text analysis), only for Video
+            const response = await this.aiService.chat({
+                messages: [
+                    // System prompt simplified and forceful
+                    { role: 'system', content: 'You are a JSON Extractor. Output ONLY valid JSON array.' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.1
+            });
 
-            const jsonStr = response.content.match(/\[.*\]/s)?.[0];
-            if (!jsonStr) return null; // Parse error -> Fallback
-            return JSON.parse(jsonStr);
-        } catch (e) {
-            console.error("AI Analysis Error:", e);
-            return null; // Error -> Fallback
+            if (!response || !response.text) throw new Error("Risposta vuota dall'IA");
+
+            console.log('[Consistency] Raw AI Response:', response.text); // DEBUG RAW log in browser
+
+            // CLEANUP JSON (Robust for Ollama/Local LLMs)
+            let jsonString = response.text.trim();
+            // 1. Remove Markdown code fences
+            if (jsonString.includes('```')) {
+                jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+            }
+
+            // 2. Locate the Array Brackets [] to ignore conversational filler
+            const firstBracket = jsonString.indexOf('[');
+            const lastBracket = jsonString.lastIndexOf(']');
+            if (firstBracket !== -1 && lastBracket !== -1) {
+                jsonString = jsonString.substring(firstBracket, lastBracket + 1);
+            } else {
+                this.log("ERRORE: Nessun JSON array trovato nella risposta raw.", 'error');
+                console.warn("Invalid JSON structure:", response.text);
+                return null;
+            }
+
+            try {
+                return JSON.parse(jsonString);
+            } catch (pError) {
+                console.error('[Consistency] JSON Parse Error. Cleaned:', jsonString);
+                this.log(`Errore parsing JSON: ${pError.message}`, 'error');
+                return null;
+            }
+
+        } catch (error) {
+            console.error('[Consistency] AI Analysis Runtime Error:', error);
+            this.log(`Errore API IA: ${error.message}`, 'error');
+            // If it's a 429/Quota error, return null to signal quota exhaustion
+            if (error.message.includes('429') || error.message.includes('Quota')) {
+                this.log("QUOTA SUPERATA / RATE LIMIT.", 'warning');
+            }
+            return null;
         }
     }
 
@@ -202,9 +409,10 @@ export class ConsistencyEngine {
             'Ma', 'Però', 'Quindi', 'E', 'O', 'Se', 'Sì', 'Si', 'No', 'Non', 'Che', 'Chi', 'Cosa', 'Dove', 'Quando', 'Perché', 'Come',
             'Tutto', 'Tutti', 'Tutta', 'Tutte', 'Niente', 'Nulla', 'Qualche', 'Alcuni', 'Molti', 'Pochi',
             'Io', 'Tu', 'Lui', 'Lei', 'Noi', 'Voi', 'Loro', 'Esso', 'Essa', 'Essi', 'Esse',
-            'Mio', 'Tuo', 'Suo', 'Nostro', 'Vostro', 'Loro', 'Mia', 'Tua', 'Sua', 'Nostra', 'Vostra',
-            'Qui', 'Qua', 'Lì', 'Là', 'Su', 'Giù', 'Dentro', 'Fuori',
-            'Eccolo', 'Eccola', 'Disse', 'Rispose', 'Signore', 'Signora', 'Re', 'Regina', 'C', 'Era'
+            'Mio', 'Tuo', 'Suo', 'Nostra', 'Vostro', 'Loro', 'Mia', 'Tua', 'Sua', 'Nostra', 'Vostra',
+            'Qui', 'Qua', 'Lì', 'Là', 'Su', 'Giù', 'Dentro', 'Fuori', 'Sopra', 'Sotto', 'Dietro', 'Davanti',
+            'Eccolo', 'Eccola', 'Disse', 'Rispose', 'Signore', 'Signora', 'Re', 'Regina', 'C', 'Era',
+            'Dopo', 'Prima', 'Durante', 'Mentre', 'Verso', 'Oltre', 'Presso', 'Intanto', 'Infine', 'Tuttavia', 'Allora', 'Inoltre'
         ]);
 
         const matches = text.match(/\b[A-Z][a-zàèéìòù]{2,}\b/g) || [];

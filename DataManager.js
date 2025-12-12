@@ -107,6 +107,24 @@ export const DataManager = {
   },
 
   // --- Metodi per Progetti e Impostazioni ---
+  async getProjectData(projectId) {
+    const db = await getDb();
+    const data = { projectId, exportedAt: new Date().toISOString() };
+
+    // Serial execution to avoid saturating IDB
+    for (const store of STORE_NAMES) {
+      if (store === 'settings') continue;
+      if (store === 'projects') {
+        const p = await db.get('projects', projectId);
+        if (p) data.project = p;
+      } else {
+        const items = await db.getAllFromIndex(store, 'by_projectId', projectId);
+        data[store] = items;
+      }
+    }
+    return data;
+  },
+
   async deleteProject(id) {
     const db = await getDb();
     const tx = db.transaction(STORE_NAMES, 'readwrite');

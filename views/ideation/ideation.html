@@ -44,9 +44,32 @@
       <h3 class="text-xl font-display text-accent mb-3 flex items-center gap-2">
         <i data-lucide="sparkles" class="w-5 h-5"></i>
         Suggerimenti Editoriali
+        <button id="force-analysis-btn"
+          class="ml-2 text-secondary hover:text-accent transition-colors p-1 rounded hover:bg-white/5"
+          title="Forza Nuova Analisi Completa">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+        <label for="memvid-upload"
+          class="cursor-pointer ml-1 text-secondary hover:text-accent transition-colors p-1 rounded hover:bg-white/5"
+          title="Carica MemVid (Video Memory)">
+          <i data-lucide="video" class="w-4 h-4"></i>
+          <input type="file" id="memvid-upload" accept="video/mp4,video/quicktime" class="hidden">
+        </label>
       </h3>
       <div id="ideation-alerts-list" class="space-y-3">
         <!-- Alerts injected here -->
+      </div>
+
+      <!-- DEBUG CONSOLE (Requested by User) -->
+      <div class="mt-4 p-4 bg-black/50 rounded text-xs font-mono text-gray-400 border border-gray-700">
+        <div class="flex justify-between items-center mb-2">
+          <span class="font-bold text-gray-300">LOG SISTEMA / AI DEBUG</span>
+          <button onclick="document.getElementById('debug-log-content').innerHTML=''"
+            class="text-accent hover:underline">Clear</button>
+        </div>
+        <div id="debug-log-content" class="h-32 overflow-y-auto space-y-1">
+          <div>In attesa di log...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -58,6 +81,11 @@
         class="flex items-center text-sm px-3 py-1 bg-secondary text-primary font-bold rounded-lg hover:bg-accent hover:text-primary transition">
         <i data-lucide="plus" class="mr-1 h-4 w-4"></i>Aggiungi Personaggio
       </button>
+    </div>
+
+    <!-- Alert Container for Characters -->
+    <div id="character-alerts" class="mb-6 hidden">
+      <div id="character-alerts-list" class="space-y-2"></div>
     </div>
 
     <div class="filter-section bg-secondary p-4 rounded-xl border border-accent/20 mb-6">
@@ -83,6 +111,11 @@
   </div>
 
   <div id="worldbuilding-content" class="ideation-tab-content hidden h-full flex flex-col">
+    <!-- Alert Container for World Building -->
+    <div id="world-alerts" class="mb-6 hidden">
+      <div id="world-alerts-list" class="space-y-2"></div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 mb-8">
       <div class="flex flex-col">
         <div class="flex justify-between items-center mb-4">
