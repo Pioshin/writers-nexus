@@ -4,6 +4,7 @@ export class ConsistencyEngine {
         this.toast = toast;
         this.aiService = aiService;
         this.issues = [];
+        this.logHistory = []; // Log buffer persistence
         this.isRunning = false;
         this.aiStatus = 'unknown'; // 'online', 'offline', 'error'
         this.currentProjectId = null;
@@ -15,10 +16,21 @@ export class ConsistencyEngine {
     }
 
     log(msg, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
         console.log(`[ConsistencyEngine] ${msg}`);
+
+        // Persist to history (Last 50)
+        const logEntry = { message: msg, type, timestamp };
+        this.logHistory.unshift(logEntry); // Newest first
+        if (this.logHistory.length > 50) this.logHistory.pop();
+
         window.dispatchEvent(new CustomEvent('consistency-log', {
-            detail: { message: msg, type, timestamp: new Date().toLocaleTimeString() }
+            detail: logEntry
         }));
+    }
+
+    getLogHistory() {
+        return this.logHistory;
     }
 
     reset() {
@@ -26,7 +38,14 @@ export class ConsistencyEngine {
         this.isRunning = false;
         this.currentProjectId = null;
         this.broadcastIssues();
+        this.broadcastProgress('idle'); // Clear indicator
         console.log('[ConsistencyEngine] Reset complete.');
+    }
+
+    broadcastProgress(status, message = '', details = '') {
+        window.dispatchEvent(new CustomEvent('consistency-progress', {
+            detail: { status, message, details }
+        }));
     }
 
     init() {
@@ -53,6 +72,7 @@ export class ConsistencyEngine {
         try {
             // ... existing setup ...
             const projectId = await this.dataManager.getCurrentProjectId();
+            this.currentProjectId = projectId; // Ensure this is set for checkpoints!
             // ... 
 
             // ... fetching logic ...
@@ -70,7 +90,11 @@ export class ConsistencyEngine {
 
             const context = { scenes, characters, locations, objects, systems, plotlines, projectId, projectTitle: project.title };
 
-            for (const rule of this.rules) {
+            for (let i = 0; i < this.rules.length; i++) {
+                const rule = this.rules[i];
+                // Notify progress
+                this.broadcastProgress('running', `Esecuzione regola ${i + 1}/${this.rules.length}...`, 'Analisi coerenza in corso');
+
                 // Pass forceAI to rules
                 const ruleIssues = await rule(context, forceAI);
                 if (ruleIssues && ruleIssues.length) {
@@ -85,10 +109,14 @@ export class ConsistencyEngine {
             }
 
             this.broadcastIssues();
+            this.broadcastProgress('complete', 'Analisi completata', `${this.issues.length} problemi trovati`);
+            setTimeout(() => this.broadcastProgress('idle'), 3000); // Hide after 3s
+
         } catch (error) {
             console.error('[ConsistencyEngine] Error during audit:', error);
             this.aiStatus = 'error';
             this.broadcastIssues();
+            this.broadcastProgress('error', 'Errore durante l\'analisi', error.message);
         } finally {
             this.isRunning = false;
         }
@@ -108,6 +136,7 @@ export class ConsistencyEngine {
 
         // VISUAL CLEANUP: Clear valid issues immediately
         this.issues = [];
+        this.aiStatus = 'loading'; // Signal UI that we are working
         this.broadcastIssues();
 
         try {
@@ -164,16 +193,6 @@ export class ConsistencyEngine {
     async checkGhostCharacters(context, forceAI = false) {
         const issues = [];
         const { scenes, characters, locations, objects, systems } = context;
-
-        // 1. Build a Set of known names (normalized)
-        const knownNames = new Set([
-            ...characters.map(c => c.name.toLowerCase()),
-            ...locations.map(l => l.name.toLowerCase()),
-            ...objects.map(o => o.name.toLowerCase()),
-            ...systems.map(s => s.name.toLowerCase())
-        ]);
-
-        // 2. Iterate scenes
         let aiConfigured = false;
         try {
             // We check settings but we ONLY run AI if forceAI is true
@@ -181,75 +200,176 @@ export class ConsistencyEngine {
             if (config.aiApiKey || config.geminiKey || config.openaiKey) aiConfigured = true;
         } catch (e) { }
 
+        // PHASE 1: BATCH EXTRACTION (No Saving)
+        // Accumulate raw entities from all scenes
+        const rawEntitiesBatch = []; // [{ sceneId, entities: [] }]
+        let scenesUpdatedCount = 0;
+
         for (const scene of context.scenes) {
             if (!scene.content || scene.content.length < 50) continue;
 
-            let entities = scene.extractedEntities;
-            let source = scene.extractionSource;
-
-            // Only re-analyze if content changed OR if we are forcing AI
-            // AND if forceAI is true. If forceAI is false, we try heuristic if no entities exist.
             const sceneHash = this.computeHash(scene.content);
-            const needsAnalysis = scene.contentHash !== sceneHash || !entities || entities.length === 0;
+            const needsAnalysis = scene.contentHash !== sceneHash || !scene.extractedEntities || scene.extractedEntities.length === 0;
 
-            if (needsAnalysis || (forceAI && source !== 'ai')) {
-                // DEFAULT: HEURISTIC
-                source = 'heuristic';
+            // Decide if we run analysis
+            if (needsAnalysis || (forceAI && scene.extractionSource !== 'ai')) {
+                let sceneEntities = [];
+                let source = 'heuristic';
 
-                // AI TRIGGER: Only if explicitly forced AND configured
+                // Try AI
                 if (forceAI && aiConfigured) {
                     try {
-                        console.log(`[Consistency] Manual AI Analysis triggered for "${scene.title}"...`);
-                        const result = await this.analyzeSceneWithAI(scene.content, context.projectTitle);
+                        this.log(`[Consistency] Analisi AI (${scene.title})...`, 'info');
+                        this.broadcastProgress('running', `Analisi AI: ${scene.title}`, 'Estrazione entità in corso...');
+
+                        const result = await this.analyzeSceneWithAI(scene.content, context.projectTitle, true); // worker=true
                         if (result) {
-                            entities = result;
+                            sceneEntities = result;
                             source = 'ai';
-                            // RATE LIMITING: Wait 10 seconds between checks to avoid 429 Google AI errors (Quota: 5/min approx)
-                            // Only wait if we actually called the AI
-                            this.log("Attesa rispetto quota API (5s)...", 'info');
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        } else {
-                            // Fallback if AI returned null (quota/error)
-                            entities = this.analyzeSceneHeuristic(scene.content);
                         }
                     } catch (e) {
-                        console.warn("AI Manual Trigger Failed:", e);
-                        entities = this.analyzeSceneHeuristic(scene.content);
+                        console.error(`AI Analysis failed for ${scene.title}`, e);
+                        // Fallback to empty if AI fails but was forced? Or heuristic?
+                        // If forced, we skip heuristic to avoid pollution.
+                        source = 'error';
                     }
-                } else if (!entities || needsAnalysis) {
-                    // Always fallback to heuristic for automatic runs
-                    // console.log(`[Consistency] Auto-Audit (Heuristic) for "${scene.title}"`);
-                    entities = this.analyzeSceneHeuristic(scene.content);
+                } else if (needsAnalysis && (!forceAI || !aiConfigured)) {
+                    // Heuristic fallback
+                    sceneEntities = this.analyzeSceneHeuristic(scene.content);
+                    source = 'heuristic';
                 }
 
-                if (entities) {
-                    scene.extractedEntities = entities; // Should we store source too? Yes but simplifying for now.
-                    scene.extractionSource = source; // Store source
+                if (source !== 'error') {
+                    // --- CHECKPOINT SAVE (Salvataggio Incrementale) ---
+                    // Salviamo subito per evitare perdita dati in caso di crash/reload
+                    scene.extractedEntities = sceneEntities;
+                    scene.extractionSource = source;
                     scene.contentHash = sceneHash;
-                    await this.dataManager.saveScene(scene);
+                    await this.dataManager.saveProjectItem(this.currentProjectId, 'scenes', scene);
+
+                    rawEntitiesBatch.push({
+                        scene,                // Reference to modify later (phase 3)
+                        entities: sceneEntities,
+                        source,
+                        newHash: sceneHash
+                    });
+                    scenesUpdatedCount++;
+                }
+            } else {
+                // If no analysis needed, we still might want to include existing entities for Global Consolidation?
+                // Yes, otherwise we miss context from unchanged scenes.
+                if (scene.extractedEntities) {
+                    rawEntitiesBatch.push({
+                        scene,
+                        entities: scene.extractedEntities,
+                        source: scene.extractionSource || 'previous',
+                        newHash: sceneHash,
+                        skippedAnalysis: true // Flag to skip save if not needed
+                    });
                 }
             }
+        }
 
-            // 3. Compare extracted entities with known DB
-            entities.forEach(entity => {
-                if (!knownNames.has(entity.name.toLowerCase())) {
-                    // Check if already reported for this check run to avoid duplicates across scenes?
-                    // No, usually we want to know *where* it appears, but for the dashboard summary we might group.
-                    // For now, let's just push unique issues per entity name to avoid spamming the user with 50 alerts for "Terrax"
+        // PHASE 2: CONSOLIDATION (AI or Merging)
+        // We have all entities. Now we consolidate them.
+        this.broadcastProgress('running', 'Consolidamento Dati', 'Unificazione duplicati e categorizzazione...');
 
-                    const existingIssue = issues.find(i => i.data.name.toLowerCase() === entity.name.toLowerCase());
+        let allEntitiesFlat = [];
+        rawEntitiesBatch.forEach(item => {
+            // Add scene context to each entity
+            item.entities.forEach(e => {
+                allEntitiesFlat.push({ ...e, sceneId: item.scene.id });
+            });
+        });
+
+        // If we have new analyses (forceAI), we run the Global Consolidator
+        // To avoid HUGE tokens, we might skip this if too many entities, or do it smart.
+        // For now, let's implement the logic requested: AI Cleanup.
+
+        let consolidatedMap = new Map(); // Name -> { type, ... }
+
+        if (forceAI && aiConfigured && allEntitiesFlat.length > 0) {
+            try {
+                this.log(`[Consistency] Consolidamento Finale (${allEntitiesFlat.length} entità grezze)...`);
+                const consolidatedList = await this.consolidateEntitiesWithAI(allEntitiesFlat);
+
+                // Build a map for quick lookup
+                consolidatedList.forEach(c => {
+                    // c should have { name, type, originalNames: [] }
+                    // Map ALL original names to this consolidated entry
+                    if (c.originalNames) {
+                        c.originalNames.forEach(orig => consolidatedMap.set(orig.toLowerCase(), c));
+                    }
+                    consolidatedMap.set(c.name.toLowerCase(), c);
+                });
+
+            } catch (e) {
+                console.warn("[Consistency] Consolidation failed, using raw data.", e);
+            }
+        }
+
+        // PHASE 3: COMMIT & REPORT
+        this.broadcastProgress('running', 'Salvataggio', 'Aggiornamento database...');
+
+        // Prepare list of known database items for Ghost Detection
+        const knownNames = new Set([
+            ...characters.map(c => c.name.toLowerCase()),
+            ...locations.map(l => l.name.toLowerCase()),
+            ...objects.map(o => o.name.toLowerCase()),
+            ...systems.map(s => s.name.toLowerCase())
+        ]);
+
+
+        // Apply back to scenes
+        for (const batchItem of rawEntitiesBatch) {
+            const { scene, entities, source, newHash, skippedAnalysis } = batchItem;
+
+            // If we have consolidated data, refuse the entities
+            let finalEntities = entities;
+
+            if (consolidatedMap.size > 0) {
+                finalEntities = entities.map(e => {
+                    const cons = consolidatedMap.get(e.name.toLowerCase());
+                    if (cons) {
+                        return {
+                            name: cons.name, // Use canonical name
+                            type: cons.type,
+                            role: cons.role || e.role,
+                            description: cons.description || e.description
+                        };
+                    }
+                    return e;
+                });
+            }
+
+            // Save if modified
+            if (!skippedAnalysis) {
+                scene.extractedEntities = finalEntities;
+                scene.extractionSource = source;
+                scene.contentHash = newHash;
+                await this.dataManager.saveScene(scene);
+            }
+
+            // Detect Ghosts (Validation)
+            // Use finalEntities logic
+            finalEntities.forEach(entity => {
+                const canonName = entity.name;
+                const lowerName = canonName.toLowerCase();
+
+                if (!knownNames.has(lowerName)) {
+                    const existingIssue = issues.find(i => i.data.name.toLowerCase() === lowerName);
                     if (existingIssue) {
                         existingIssue.data.count++;
-                        existingIssue.message = `"${existingIssue.data.name}" appare in più scene (${existingIssue.data.count}). Non è nel database.`;
+                        existingIssue.message = `"${canonName}" appare in più scene (${existingIssue.data.count}). Non è nel database.`;
                     } else {
                         issues.push({
                             type: 'ghost_character',
                             severity: 'info',
-                            projectName: context.projectTitle, // Added context
+                            projectName: context.projectTitle,
                             projectId: context.projectId,
-                            source: scene.extractionSource || 'unknown',
-                            message: `"${entity.name}" rilevato nel testo ma non nel database.`,
-                            data: { name: entity.name, type: entity.type || 'Entità', count: 1 }
+                            source: source || 'unknown',
+                            message: `"${canonName}" rilevato ma non nel database.`,
+                            data: { name: canonName, type: entity.type || 'Entità', count: 1 }
                         });
                     }
                 }
@@ -257,6 +377,38 @@ export class ConsistencyEngine {
         }
 
         return issues;
+    }
+
+    async consolidateEntitiesWithAI(flatEntityList) {
+        if (!this.aiService) return [];
+        // Limit list size to avoid context overflow (approx 1000 items max for now)
+        const uniqueNames = [...new Set(flatEntityList.map(e => e.name))];
+        if (uniqueNames.length === 0) return [];
+        if (uniqueNames.length > 500) {
+            console.warn("Too many entities for atomic consolidation. Skipping AI consolidation.");
+            return []; // Fallback to raw
+        }
+
+        try {
+            // Use Background Worker for Consolidation to enable Streaming & Progress Feedback
+            // The prompt logic is now inside ai.worker.js (type='consolidation')
+            const resultRaw = await this.aiService.analyzeBackground(JSON.stringify(uniqueNames), 'consolidation');
+
+            // Result should be the raw JSON string (or text containing JSON)
+            let jsonString = resultRaw.replace(/```json|```/g, '').trim();
+
+            const firstBracket = jsonString.indexOf('[');
+            const lastBracket = jsonString.lastIndexOf(']');
+            if (firstBracket !== -1 && lastBracket !== -1) {
+                jsonString = jsonString.substring(firstBracket, lastBracket + 1);
+                return JSON.parse(jsonString);
+            }
+            return [];
+
+        } catch (e) {
+            console.error("Consolidation Error:", e);
+            throw e;
+        }
     }
 
     async analyzeVideoMemory(fileData) {
@@ -319,79 +471,81 @@ export class ConsistencyEngine {
         }
     }
 
-    async analyzeSceneWithAI(text, projectTitle = '') {
+    async analyzeSceneWithAI(text, projectTitle = '', useWorker = false) {
         if (!this.aiService) return null;
-
-        // Short-circuit if text is too short
         if (text.length < 50) return null;
 
-        this.log(`Analisi scena "${projectTitle ? projectTitle : '...'}" (len: ${text.length}) avviata...`);
+        // WORKER PATH (TOON Protocol)
+        if (useWorker) {
+            try {
+                this.log("Accodamento al Worker...", 'info');
+                // analyzeBackground ritorna direttamente oggetto TOON: { c:[], l:[], ... }
+                const toonData = await this.aiService.analyzeBackground(text, 'extraction');
+
+                if (!toonData) return null;
+
+                // Converter TOON -> Consistency Entity Format [{name, type}]
+                // Il motore di consistenza per ora vuole un array piatto semplice per il controllo ghost
+                const entities = [];
+
+                // Map Characters (c)
+                if (Array.isArray(toonData.c)) {
+                    toonData.c.forEach(x => {
+                        if (x.n) entities.push({ name: x.n, type: 'Personaggio', role: x.r, description: x.d });
+                    });
+                }
+                // Map Locations (l)
+                if (Array.isArray(toonData.l)) {
+                    toonData.l.forEach(x => {
+                        if (x.n) entities.push({ name: x.n, type: 'Luogo', description: x.d });
+                    });
+                }
+                // Map Objects (o)
+                if (Array.isArray(toonData.o)) {
+                    toonData.o.forEach(x => {
+                        if (x.n) entities.push({ name: x.n, type: 'Oggetto', description: x.d });
+                    });
+                }
+                // Map Systems/Culture (k) -> Sistema
+                if (Array.isArray(toonData.k)) {
+                    toonData.k.forEach(x => {
+                        if (x.n) entities.push({ name: x.n, type: 'Sistema', description: x.d });
+                    });
+                }
+
+                return entities;
+
+            } catch (err) {
+                console.error("Worker Error:", err);
+                this.log("Errore Worker: " + err.message, 'error');
+                throw err; // Propagate to block heuristic fallback
+            }
+        }
+
+        // LEGACY PATH (Direct Chat)
+        // ... (Vecchio codice se useWorker false, mantenuto per compatibilità)
         const prompt = `
         TASK: Extract Named Entities from the text below as a JSON Array.
-        
-        RULES:
-        1. OUTPUT ONLY JSON. NO intro, NO markdown.
-        2. Detect: Person (Personaggio), Place (Luogo), Object (Oggetto), Organization (Sistema).
-        3. IGNORE common words (The, A, Look, After).
-        4. Context matters: "Terrax" acting = Person. "Terrax" visited = Place.
-
-        EXAMPLE OUTPUT:
-        [{"name": "Geralt", "type": "Personaggio"}, {"name": "Rivia", "type": "Luogo"}]
-
-        TEXT:
-        ${text.substring(0, 4000)} 
+        RULES:Output ONLY JSON. Detect: Person (Personaggio), Place (Luogo), Object (Oggetto).
+        TEXT: ${text.substring(0, 4000)} 
         `;
 
         try {
-            this.log(`Invio richiesta IA...`, 'info');
-            // Use low temp for determinstic JSON
-            // Note: inlineData is NOT used here (text analysis), only for Video
             const response = await this.aiService.chat({
-                messages: [
-                    // System prompt simplified and forceful
-                    { role: 'system', content: 'You are a JSON Extractor. Output ONLY valid JSON array.' },
-                    { role: 'user', content: prompt }
-                ],
+                messages: [{ role: 'user', content: prompt }],
                 temperature: 0.1
             });
-
-            if (!response || !response.text) throw new Error("Risposta vuota dall'IA");
-
-            console.log('[Consistency] Raw AI Response:', response.text); // DEBUG RAW log in browser
-
-            // CLEANUP JSON (Robust for Ollama/Local LLMs)
-            let jsonString = response.text.trim();
-            // 1. Remove Markdown code fences
-            if (jsonString.includes('```')) {
-                jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
-            }
-
-            // 2. Locate the Array Brackets [] to ignore conversational filler
+            // ... (simple parsing logica esistente o semplificata)
+            let jsonString = response.text.replace(/```json|```/g, '').trim();
             const firstBracket = jsonString.indexOf('[');
             const lastBracket = jsonString.lastIndexOf(']');
             if (firstBracket !== -1 && lastBracket !== -1) {
                 jsonString = jsonString.substring(firstBracket, lastBracket + 1);
-            } else {
-                this.log("ERRORE: Nessun JSON array trovato nella risposta raw.", 'error');
-                console.warn("Invalid JSON structure:", response.text);
-                return null;
-            }
-
-            try {
                 return JSON.parse(jsonString);
-            } catch (pError) {
-                console.error('[Consistency] JSON Parse Error. Cleaned:', jsonString);
-                this.log(`Errore parsing JSON: ${pError.message}`, 'error');
-                return null;
             }
-
+            return null;
         } catch (error) {
-            console.error('[Consistency] AI Analysis Runtime Error:', error);
-            this.log(`Errore API IA: ${error.message}`, 'error');
-            // If it's a 429/Quota error, return null to signal quota exhaustion
-            if (error.message.includes('429') || error.message.includes('Quota')) {
-                this.log("QUOTA SUPERATA / RATE LIMIT.", 'warning');
-            }
+            console.error('[Consistency] Legacy AI Error:', error);
             return null;
         }
     }

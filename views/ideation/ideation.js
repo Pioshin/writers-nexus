@@ -850,67 +850,133 @@ export default {
       });
     }
 
+    // --- HELPERS GESTIONE BLACKLIST ---
+    const getIgnoredList = () => {
+      try {
+        return JSON.parse(localStorage.getItem(`ignored_suggestions_${currentProjectId}`) || '[]');
+      } catch { return []; }
+    };
+
+    const addToIgnoreList = (name) => {
+      const list = getIgnoredList();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem(`ignored_suggestions_${currentProjectId}`, JSON.stringify(list));
+      }
+      // Force re-render to hide ignored
+      const evt = new CustomEvent('consistency-issues-updated', {
+        detail: { issues: window.consistencyEngine?.issues || [], aiStatus: window.consistencyEngine?.aiStatus }
+      });
+      window.dispatchEvent(evt);
+    };
+
+    const clearIgnoreList = () => {
+      localStorage.removeItem(`ignored_suggestions_${currentProjectId}`);
+    };
+
+    window.ignoreEntityIssue = (name) => {
+      addToIgnoreList(name);
+    };
+
+    window.ignoreAllGhostCharacters = () => {
+      if (!window.consistencyEngine?.issues) return;
+      const toIgnore = window.consistencyEngine.issues
+        .filter(i => i.type === 'ghost_character')
+        .map(i => i.data.name);
+
+      const list = getIgnoredList();
+      const newList = [...new Set([...list, ...toIgnore])];
+      localStorage.setItem(`ignored_suggestions_${currentProjectId}`, JSON.stringify(newList));
+
+      // Refresh
+      const evt = new CustomEvent('consistency-issues-updated', {
+        detail: { issues: window.consistencyEngine?.issues || [], aiStatus: window.consistencyEngine?.aiStatus }
+      });
+      window.dispatchEvent(evt);
+    };
+
+
     // Consistency Alerts Listener (Ideation View Specific)
-    // Consistency Alerts Listener (Ideation View Specific)
-    // Helper function to render issues
     const renderConsistencyIssues = (allIssues, aiStatus = 'online') => {
       const container = document.getElementById('view-ideation');
       if (!container || !currentProjectId) return;
 
-      // Filter issues for THIS project
-      const issues = (allIssues || []).filter(i => i.projectId === currentProjectId);
+      // Filter issues for THIS project AND NOT IGNORED
+      const ignored = getIgnoredList();
+      const issues = (allIssues || []).filter(i =>
+        i.projectId === currentProjectId &&
+        !ignored.includes(i.data?.name)
+      );
 
       // --- 1. IDEAS TAB: SUMMARY ONLY ---
       const summaryContainer = document.getElementById('ideation-alerts');
       const summaryList = document.getElementById('ideation-alerts-list');
 
       if (summaryContainer && summaryList) {
-        const charCount = issues.filter(i => i.type === 'ghost_character' || (i.data?.type && i.data.type.toLowerCase().includes('personaggio'))).length;
-        const wbCount = issues.length - charCount;
+        // Improved Counting: Deduplicate by name
+        const ghostIssues = issues.filter(i => i.type === 'ghost_character' || (i.data?.type && i.data.type.toLowerCase().includes('personaggio')));
+        const uniqueNames = new Set(ghostIssues.map(i => i.data?.name?.toLowerCase().trim()));
+        const charCount = uniqueNames.size;
 
-        // Check for Heuristic/Error status
+        const wbCount = issues.length - ghostIssues.length;
+
+        // Check for Heuristic/Error/Loading status
         const isHeuristic = issues.some(i => i.source === 'heuristic');
         const isError = aiStatus === 'error';
         const isNotConfigured = aiStatus === 'not_configured';
+        const isLoading = aiStatus === 'loading' || aiStatus === 'online';
 
-        summaryContainer.classList.remove('hidden'); // Always show container to explain status
+        summaryContainer.classList.remove('hidden');
         summaryList.innerHTML = '';
 
-        // Status Banner
-        if (isError || isNotConfigured || isHeuristic) {
-          const statusDiv = document.createElement('div');
-          let statusMsg = isHeuristic ? "Modalità Euristica (AI non disponibile o fallita). Risultati approssimativi." : "AI: Stato sconosciuto.";
-          if (isNotConfigured) statusMsg = "AI non configurata. Vai in Impostazioni.";
-          if (isError) statusMsg = "Errore connessione AI. Verifica rete/chiavi.";
-
-          statusDiv.className = 'bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-xs text-yellow-200 mb-2 flex items-center gap-2';
-          statusDiv.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3"></i> ${statusMsg}`;
-          summaryList.appendChild(statusDiv);
+        if (isLoading) {
+          const loadingDiv = document.createElement('div');
+          loadingDiv.className = 'bg-blue-500/10 border border-blue-500/30 p-3 rounded text-sm text-blue-200 mb-2 flex items-center gap-3';
+          loadingDiv.innerHTML = `
+                <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+                <span>Analisi AI in corso... richiede molto tempo, intanto puoi continuare a scrivere o gestire la struttura.</span>
+             `;
+          summaryList.appendChild(loadingDiv);
+          if (window.lucide) window.lucide.createIcons();
+          return;
         }
 
         if (issues.length === 0) {
-          if (!isError && !isNotConfigured) summaryList.innerHTML += `<div class="text-sm text-secondary italic">Nessun problema rilevato.</div>`;
+          // Se non ci sono issue attive, nascondiamo tutto il container summary se non ci sono errori
+          if (!isError && !isNotConfigured) {
+            summaryContainer.classList.add('hidden');
+          }
         } else {
-          // Create Summary Card
+          // Status Banner se errore critico
+          if (isError || isNotConfigured) {
+            const statusDiv = document.createElement('div');
+            let statusMsg = "AI: Stato sconosciuto.";
+            if (isError) statusMsg = "Errore connessione AI.";
+            if (isNotConfigured) statusMsg = "AI non configurata. Modalità offline.";
+
+            statusDiv.className = 'bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-xs text-yellow-200 mb-2 flex items-center gap-2';
+            statusDiv.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3"></i> ${statusMsg}`;
+            summaryList.appendChild(statusDiv);
+          }
+
+
+          summaryContainer.classList.remove('hidden');
           const div = document.createElement('div');
           div.className = 'flex flex-col gap-2';
           div.innerHTML = `
                     <div class="flex items-center gap-2 text-primary font-medium">
                         <i data-lucide="sparkles" class="w-4 h-4 text-accent"></i>
-                        <span>Analisi Coerenza Completata</span>
+                        <span>Analisi Coerenza (${issues.length})</span>
                     </div>
                     ${charCount > 0 ? `<div class="text-sm text-secondary bg-white/5 p-2 rounded ml-6 cursor-pointer hover:bg-white/10" onclick="document.querySelector('[data-tab=\\'characters\\']').click()">
                         Trovati <strong>${charCount}</strong> nuovi Personaggi potenziali. <span class="text-accent underline">Vedi Tab Personaggi</span>
-                    </div>` : ''}
-                    ${wbCount > 0 ? `<div class="text-sm text-secondary bg-white/5 p-2 rounded ml-6 cursor-pointer hover:bg-white/10" onclick="document.querySelector('[data-tab=\\'worldbuilding\\']').click()">
-                        Trovati <strong>${wbCount}</strong> elementi di World Building. <span class="text-accent underline">Vedi Tab World Building</span>
                     </div>` : ''}
                 `;
           summaryList.appendChild(div);
         }
       }
 
-      // --- 2. CHARACTERS TAB: DETAILED LIST ---
+      // --- 2. CHARACTERS TAB: COLLAPSIBLE ACCORDION ---
       const charContainer = document.getElementById('character-alerts');
       const charList = document.getElementById('character-alerts-list');
       if (charContainer && charList) {
@@ -920,57 +986,137 @@ export default {
           charContainer.classList.add('hidden');
         } else {
           charContainer.classList.remove('hidden');
-          charList.innerHTML = '';
-          // Show up to 30 items
-          charIssues.slice(0, 30).forEach(issue => {
-            const el = document.createElement('div');
-            el.className = 'p-3 rounded-lg border bg-blue-500/10 border-blue-500/30 flex items-center justify-between gap-3';
-            el.innerHTML = `
-                         <div class="flex items-center gap-3">
-                             <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs">AI</div>
-                             <div>
-                                 <p class="text-sm font-medium text-primary">${issue.data.name}</p>
-                                 <p class="text-xs text-secondary">Rilevato in ${issue.data.count || 1} scene</p>
-                             </div>
-                         </div>
-                         <button class="text-xs bg-accent/20 hover:bg-accent/40 text-accent px-3 py-1.5 rounded transition-colors" 
-                             onclick="window.resolveEntityIssue('${issue.data.name.replace(/'/g, "\\'")}', '${issue.data.type}')">
-                             Registra
-                         </button>
-                     `;
-            charList.appendChild(el);
-          });
+          // Deduplicate for display
+          const unique = {};
+          charIssues.forEach(g => { if (!unique[g.data.name]) unique[g.data.name] = g; });
+          const uniqueList = Object.values(unique);
+
+          // Render Accordion Header
+          charList.innerHTML = `
+            <div class="bg-secondary/30 border border-accent/20 rounded-lg overflow-hidden transition-all duration-300">
+                <div class="p-3 bg-white/5 flex items-center justify-between cursor-pointer hover:bg-white/10" id="toggle-char-suggestions">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-accent/20 text-accent text-xs font-bold px-2 py-0.5 rounded-full">${uniqueList.length}</span>
+                        <span class="text-sm font-semibold text-primary">Suggerimenti IA Personaggi</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="text-xs text-secondary mr-2">Clicca per espandere</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 text-secondary transition-transform duration-300" id="chevron-char-suggestions"></i>
+                    </div>
+                </div>
+                
+                <div id="char-suggestions-body" class="hidden border-t border-accent/10 bg-black/20">
+                    <!-- Actions Row -->
+                    <div class="p-2 border-b border-white/5 flex justify-end gap-2">
+                         <button onclick="window.resetIgnoredList()" class="text-xs text-secondary hover:text-white px-2 py-1 rounded hover:bg-white/10 flex items-center gap-1">
+                            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Reset Ignorati
+                        </button>
+                        <button onclick="window.ignoreAllGhostCharacters()" class="text-xs text-red-300 hover:text-red-100 px-2 py-1 rounded hover:bg-red-500/20 flex items-center gap-1">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i> Ignora Tutti
+                        </button>
+                    </div>
+                    
+                    <div class="p-3 grid grid-cols-1 lg:grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+                        ${uniqueList.map(issue => `
+                            <div class="p-2 rounded border bg-blue-500/5 border-blue-500/20 flex items-center justify-between gap-3 group hover:border-blue-500/40">
+                                <div class="flex items-center gap-3 overflow-hidden">
+                                     <div class="w-6 h-6 rounded-full ${issue.source === 'ai' ? 'bg-blue-500/10 text-blue-400' : 'bg-orange-500/10 text-orange-400'} flex-shrink-0 flex items-center justify-center font-bold text-[10px]" title="${issue.source === 'ai' ? 'Analisi AI' : 'Algoritmo Euristico'}">
+                                        ${issue.source === 'ai' ? 'AI' : 'BIO'}
+                                     </div>
+
+                                     <div class="truncate">
+                                         <p class="text-sm font-medium text-gray-200 truncate" title="${issue.data.name}">${issue.data.name}</p>
+                                     </div>
+                                </div>
+                                <div class="flex items-center gap-1 flex-shrink-0 opacity-80 group-hover:opacity-100">
+                                    <button class="text-xs bg-green-500/20 hover:bg-green-500/40 text-green-300 px-2 py-1 rounded transition-colors flex items-center gap-1" 
+                                        onclick="window.resolveEntityIssue('${issue.data.name.replace(/'/g, "\\'")}', '${issue.data.type}')" title="Accetta e Aggiungi">
+                                        <i data-lucide="check" class="w-3 h-3"></i>
+                                    </button>
+                                    <button class="text-xs bg-red-500/10 hover:bg-red-500/30 text-red-300 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                                        onclick="window.ignoreEntityIssue('${issue.data.name.replace(/'/g, "\\'")}')" title="Ignora (Nascondi)">
+                                        <i data-lucide="x" class="w-3 h-3"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+          `;
+
+          // Expose helper globally inside the render scope? better outside, but for simplicity here:
+          if (!window.resetIgnoredList) {
+            window.resetIgnoredList = () => {
+              clearIgnoreList();
+              // Refresh
+              const evt = new CustomEvent('consistency-issues-updated', {
+                detail: { issues: window.consistencyEngine?.issues || [], aiStatus: window.consistencyEngine?.aiStatus }
+              });
+              window.dispatchEvent(evt);
+              if (window.toast) toast.info('Lista ignorati resettata.');
+            };
+          }
+
+          // Accordion Logic
+          setTimeout(() => {
+            const toggleBtn = document.getElementById('toggle-char-suggestions');
+            const body = document.getElementById('char-suggestions-body');
+            const chevron = document.getElementById('chevron-char-suggestions');
+            if (toggleBtn && body && chevron) {
+              toggleBtn.onclick = () => {
+                const isHidden = body.classList.contains('hidden');
+                if (isHidden) {
+                  body.classList.remove('hidden');
+                  body.classList.add('animate-fade-in');
+                  chevron.style.transform = 'rotate(180deg)';
+                } else {
+                  body.classList.add('hidden');
+                  chevron.style.transform = 'rotate(0deg)';
+                }
+              };
+            }
+            if (window.lucide) window.lucide.createIcons();
+          }, 100);
         }
       }
 
-      // --- 3. WORLD BUILDING TAB: DETAILED LIST ---
+      // --- 3. WORLD BUILDING TABS ... (similar logic if requested, but focused on chars now) ---
+      // (Leaving existing WB logic mostly as is but applying ignore filter)
       const wbContainer = document.getElementById('world-alerts');
       const wbList = document.getElementById('world-alerts-list');
       if (wbContainer && wbList) {
-        // Filter for NOT characters (Locations, Objects, Systems)
         const wbIssues = issues.filter(i => !(i.type === 'ghost_character' || (i.data?.type && i.data.type.toLowerCase().includes('personaggio'))));
-
-        if (wbIssues.length === 0) {
-          wbContainer.classList.add('hidden');
-        } else {
+        if (wbIssues.length === 0) wbContainer.classList.add('hidden');
+        else {
           wbContainer.classList.remove('hidden');
+          // Simple non-accordion render for now as request was about characters
           wbList.innerHTML = '';
           wbIssues.slice(0, 30).forEach(issue => {
             const el = document.createElement('div');
             el.className = 'p-3 rounded-lg border bg-purple-500/10 border-purple-500/30 flex items-center justify-between gap-3';
             el.innerHTML = `
-                         <div class="flex items-center gap-3">
-                             <div class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 font-bold text-xs">AI</div>
-                             <div>
-                                 <p class="text-sm font-medium text-primary">${issue.data.name}</p>
-                                 <p class="text-xs text-secondary capitalize">${issue.data.type || 'Oggetto'}</p>
+                             <div class="flex items-center gap-3">
+                                 <div class="w-8 h-8 rounded-full ${issue.source === 'ai' ? 'bg-purple-500/20 text-purple-400' : 'bg-orange-500/10 text-orange-400'} flex items-center justify-center font-bold text-xs" title="${issue.source === 'ai' ? 'Analisi AI' : 'Algoritmo Euristico'}">
+                                    ${issue.source === 'ai' ? 'AI' : 'BIO'}
+                                 </div>
+
+                                 <div class="truncate">
+                                     <p class="text-sm font-medium text-primary">${issue.data.name}</p>
+                                     <p class="text-xs text-secondary capitalize">${issue.data.type || 'Oggetto'}</p>
+                                 </div>
                              </div>
-                         </div>
-                         <button class="text-xs bg-accent/20 hover:bg-accent/40 text-accent px-3 py-1.5 rounded transition-colors" 
-                             onclick="window.resolveEntityIssue('${issue.data.name.replace(/'/g, "\\'")}', '${issue.data.type}')">
-                             Registra
-                         </button>
-                     `;
+                             <div class="flex gap-2">
+                                <button class="text-xs bg-accent/20 hover:bg-accent/40 text-accent px-3 py-1.5 rounded transition-colors" 
+                                    onclick="window.resolveEntityIssue('${issue.data.name.replace(/'/g, "\\'")}', '${issue.data.type}')">
+                                    Registra
+                                </button>
+                                <button class="text-xs bg-white/5 hover:bg-white/10 text-secondary px-2 py-1.5 rounded" 
+                                    onclick="window.ignoreEntityIssue('${issue.data.name.replace(/'/g, "\\'")}')">
+                                    <i data-lucide="x" class="w-3 h-3"></i>
+                                </button>
+                             </div>
+                         `;
             wbList.appendChild(el);
           });
         }
@@ -1023,5 +1169,33 @@ export default {
         logContainer.prepend(line); // Newest on top
       }
     });
+
+    // --- Restore Log History if returning to view ---
+    if (window.consistencyEngine && typeof window.consistencyEngine.getLogHistory === 'function') {
+      const history = window.consistencyEngine.getLogHistory(); // [newest, ..., oldest]
+      const logContainer = document.getElementById('debug-log-content');
+
+      if (logContainer && history.length > 0) {
+        logContainer.innerHTML = '';
+        // We want Newest on Top.
+        // If we loop [A(new), B(old)] and prepend:
+        // 1. Prepend A -> [A]
+        // 2. Prepend B -> [B, A] -> Wrong order (Oldest on top?)
+        // Wait, prepend inserts before first child.
+        // If we want [A, B], we should prepend B then A?
+        // Yes. So iterate from end (Oldest) to start (Newest).
+
+        for (let i = history.length - 1; i >= 0; i--) {
+          const entry = history[i];
+          const { message, type, timestamp } = entry;
+          const color = type === 'error' ? 'text-red-400' : (type === 'success' ? 'text-green-400' : 'text-gray-300');
+          const line = document.createElement('div');
+          line.className = `${color} border-b border-white/5 pb-1`;
+          line.innerHTML = `<span class="opacity-50">[${timestamp}]</span> ${message}`;
+          logContainer.prepend(line);
+        }
+      }
+    }
   },
 };
+

@@ -67,7 +67,7 @@ function show() {
   modalEl.classList.remove('hidden');
   try {
     window.lucide?.createIcons?.();
-  } catch {}
+  } catch { }
   setTimeout(() => textArea?.focus(), 0);
 }
 function hide() {
@@ -381,7 +381,7 @@ async function runAIEnrichment(rawText) {
     };
   }
   const focus = (analysisFocusEl?.value || '').trim();
-  log('Avvio analisi AI differita...');
+  log('Avvio analisi AI differita (Background Worker)...');
 
   let entities = {
     characters: [],
@@ -395,15 +395,15 @@ async function runAIEnrichment(rawText) {
   let plotlines = [];
   let style = null;
 
-  const ctxHeader = `Analizza il seguente testo e restituisci JSON con campi: characters(name, role, archetype?), locations(name, description?), objects(name, description?), geography(name, description?), history(name, description?), culture(name, description?), relations(source, target, type), plotlines(list of names with brief description), style(voice, pacing, lexical richness, tone), ideas(optional list: title, content) se nel testo esiste una sezione idee/note.`;
-
   if (doExtract || doStyle) {
-    // Analisi più accurata: chunking su tutto il manoscritto (finestre ~5000-6000 char)
+    // Analisi più accurata: chunking su tutto il manoscritto 
+    // TOON permette chunk più grandi (8000 char)
     const chunks = [];
-    const max = 5500;
+    const max = 8000;
     for (let i = 0; i < rawText.length; i += max) {
       chunks.push(rawText.slice(i, i + max));
     }
+
     const collation = {
       characters: new Map(),
       locations: new Map(),
@@ -413,91 +413,80 @@ async function runAIEnrichment(rawText) {
       culture: new Map(),
       relations: [],
       plotlines: [],
-      styleSamples: [],
       ideas: [],
     };
-    const systemMsg = 'Rispondi esclusivamente con JSON valido.';
-    const focusHint = focus ? `\nFOCUS: ${focus}` : '';
-    log(`IA: analisi in ${chunks.length} parti per copertura completa...`);
-    for (let ci = 0; ci < chunks.length; ci++) {
-      const sample = chunks[ci];
-      const prompt = `${ctxHeader}${focusHint}\n\nESTRATTO ${ci + 1}/${chunks.length}:\n${sample}`;
-      try {
-        const { text } = await AIService.complete({
-          prompt,
-          system: systemMsg,
-          temperature: 0.2,
-          maxTokens: 900,
+
+    log(`IA: analisi in ${chunks.length} parti (Code in background)...`);
+
+    // Invia tutti i chunk al worker. Il worker ha una coda interna.
+    // Usiamo Promise.all per attendere che tutti completino (o falliscano)
+    const promises = chunks.map((chunk, ci) =>
+      AIService.analyzeBackground(chunk, 'extraction')
+        .then(toonData => ({ ci, data: toonData }))
+        .catch(err => {
+          console.error(`Chunk ${ci} failed`, err);
+          log(`Parte ${ci + 1} fallita, continuo...`);
+          return null;
+        })
+    );
+
+    const results = await Promise.all(promises);
+
+    // Processa risultati TOON
+    const mapToonItems = (items, targetMap, typeLabel) => {
+      if (!Array.isArray(items)) return;
+      items.forEach(it => {
+        const name = it.n;
+        if (!name || typeof name !== 'string' || name.length < 2) return;
+        const k = name.toLowerCase().trim();
+        const description = it.d || '';
+        const role = it.r || '';
+        const type = it.t || typeLabel || '';
+
+        const prev = targetMap.get(k);
+        let finalDesc = description;
+        if (prev && prev.description && description) {
+          finalDesc = prev.description.length > description.length ? prev.description : description;
+        }
+
+        targetMap.set(k, {
+          name,
+          description: finalDesc,
+          role, // char role
+          type, // obj type
+          ...prev,
+          ...{ name, description: finalDesc, role, type }
         });
-        // remove fences and extract JSON-ish
-        const stripped = text.replace(/^```[a-zA-Z]*\n?|```$/g, '').trim();
-        const jsonStart = stripped.indexOf('{');
-        const jsonEnd = stripped.lastIndexOf('}');
-        let body =
-          jsonStart >= 0 ? stripped.slice(jsonStart, jsonEnd + 1) : '{}';
-        // tiny repair: remove trailing commas and quote simple keys
-        body = body
-          .replace(/,\s*([}\]])/g, '$1')
-          .replace(/([,{]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-        const parsed = JSON.parse(body);
-        const addList = (lst, map, key = 'name') => {
-          (lst || []).forEach(it => {
-            const k = (it?.[key] || '').toLowerCase();
-            if (!k) return;
-            const prev = map.get(k) || it;
-            map.set(k, { ...prev, ...it });
-          });
-        };
-        addList(parsed.characters, collation.characters);
-        addList(parsed.locations, collation.locations);
-        addList(parsed.objects, collation.objects);
-        addList(parsed.geography, collation.geography);
-        addList(parsed.history, collation.history);
-        addList(parsed.culture, collation.culture);
-        collation.relations.push(...(parsed.relations || []));
-        collation.plotlines.push(...(parsed.plotlines || []));
-        if (parsed.style) collation.styleSamples.push(parsed.style);
-        if (Array.isArray(parsed.ideas))
-          collation.ideas.push(
-            ...parsed.ideas.filter(it => it?.title || it?.content)
-          );
-      } catch (e) {
-        const preview = (e?.message || '').slice(0, 80);
-        log(`Parte ${ci + 1}: parsing IA fallito (${preview}), continuo...`);
+      });
+    };
+
+    for (const res of results) {
+      if (!res || !res.data) continue;
+      const d = res.data;
+
+      mapToonItems(d.c, collation.characters, 'Personaggio');
+      mapToonItems(d.l, collation.locations, 'Luogo');
+      mapToonItems(d.g, collation.geography, 'Geografia');
+      mapToonItems(d.o, collation.objects, 'Oggetto');
+      mapToonItems(d.k, collation.culture, 'Cultura');
+
+      if (Array.isArray(d.p)) {
+        d.p.forEach(pl => {
+          if (pl.n) collation.plotlines.push({ name: pl.n, description: pl.d });
+        });
       }
     }
+
     entities.characters = Array.from(collation.characters.values());
     entities.locations = Array.from(collation.locations.values());
     entities.objects = Array.from(collation.objects.values());
     entities.geography = Array.from(collation.geography.values());
     entities.history = Array.from(collation.history.values());
     entities.culture = Array.from(collation.culture.values());
-    relations = collation.relations;
     plotlines = collation.plotlines;
-    // Idee: usa IA come fallback o merged
-    if (
-      (!ideasFromDoc || ideasFromDoc.length === 0) &&
-      collation.ideas.length
-    ) {
-      // Deduplica semplice per titolo+contenuto
-      const seen = new Set();
-      ideasFromDoc = collation.ideas.filter(it => {
-        const key = `${(it.title || '').toLowerCase()}::${(it.content || '').toLowerCase()}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    }
-    // Fusiona profili di stile basilare (placeholder): prende il più frequente tono
-    if (collation.styleSamples.length) {
-      const tones = {};
-      for (const s of collation.styleSamples) {
-        if (s?.tone) tones[s.tone] = (tones[s.tone] || 0) + 1;
-      }
-      const topTone =
-        Object.entries(tones).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-      style = { ...(collation.styleSamples[0] || {}), tone: topTone };
-    }
+
+    // Stile: per ora non implementato nel worker TOON (richiede analisi full text non compressa)
+    // Se necessario, potremmo fare una chiamata dedicata per lo stile su un campione casuale
   }
 
   return { entities, relations, plotlines, style };
@@ -587,7 +576,7 @@ async function commitToProject(
         document.dispatchEvent(
           new CustomEvent('idea-saved', { detail: { idea: saved } })
         );
-      } catch {}
+      } catch { }
     }
   }
   // Items generici helper
@@ -863,7 +852,7 @@ function init(dataManager) {
       bindSelectAll(selectAllGeographyEl, 'geography');
       bindSelectAll(selectAllHistoryEl, 'history');
       bindSelectAll(selectAllCultureEl, 'culture');
-    } catch {}
+    } catch { }
   });
 
   // COMMIT (importa ciò che è attualmente in lastResult – che può essere solo parsing o parsing+AI)
@@ -1103,7 +1092,7 @@ function init(dataManager) {
       let arr = [];
       try {
         arr = JSON.parse(body);
-      } catch {}
+      } catch { }
       if (!Array.isArray(arr)) {
         statusEl.textContent = 'Parsing suggerimenti fallito.';
         return;
@@ -1207,11 +1196,38 @@ export async function importRawText(
     let style = null;
     if (extract || analyzeStyle) {
       // reuse the same IA chunking logic (inline minimal copy)
-      const header = `Analizza il seguente testo e restituisci JSON con campi: characters(name, role, archetype?), locations(name, description?), objects(name, description?), geography(name, description?), history(name, description?), culture(name, description?), relations(source, target, type), plotlines(list of names with brief description), style(voice, pacing, lexical richness, tone), ideas(optional list: title, content).`;
+      const header = `Analizza il seguente testo narrativo e restituisci un JSON valido.
+Obiettivo: Estrarre elementi del world building e personaggi con precisione.
+
+SCHEMA JSON RICHIESTO:
+{
+  "characters": [{ "name": "Nome", "role": "Ruolo (Protagonista/Antagonista/Secondario)", "archetype": "Archetipo", "description": "Breve descrizione fisica e caratteriale" }],
+  "locations": [{ "name": "Nome Luogo", "description": "Descrizione", "type": "Luogo specifico (stanza, edificio)" }],
+  "geography": [{ "name": "Nome Geografico", "description": "Descrizione", "type": "Pianeta, Regione, Continente, Foresta, Mare" }],
+  "objects": [{ "name": "Nome Oggetto", "description": "Descrizione", "type": "Veicolo, Arma, Oggetto chiave" }],
+  "history": [{ "name": "Nome Evento", "description": "Evento passato menzionato" }],
+  "culture": [{ "name": "Nome Gruppo/Concetto", "description": "Religione, Fazione, Organizzazione, Usanza" }],
+  "relations": [{ "source": "Nome Personaggio A", "target": "Nome Personaggio B", "type": "Tipo relazione" }],
+  "plotlines": [{ "name": "Nome Trama", "description": "Descrizione linea narrativa" }],
+  "style": { "voice": "Voce narrante", "pacing": "Ritmo", "lexical_richness": "Ricchezza lessicale", "tone": "Tono prevalente" },
+  "ideas": [{ "title": "Titolo idea", "content": "Contenuto dell'appunto o nota trovata nel testo" }]
+}
+
+REGOLE CRITICHE DI CATEGORIZZAZIONE:
+1. PERSONAGGI (characters): Includi SOLO esseri senzienti/viventi (umani, alieni, robot senzienti).
+2. NON INSERIRE MAI PIANETI, ASTRONAVI, CITTÀ O ORGANIZZAZIONI IN "characters".
+   - Pianeti/Regioni -> "geography"
+   - Astronavi/Veicoli -> "objects"
+   - Città/Edifici -> "locations"
+   - Fazioni/Gruppi -> "culture"
+3. Se un'entità è ambigua, privilegia "objects" o "locations" rispetto a "characters" se non parla/agisce come persona.
+`;
+
       const chunks = [];
-      const max = 5500;
+      const max = 6000; // Aumentato leggermente per ridurre numero chiamate se il modello regge
       for (let i = 0; i < raw.length; i += max)
         chunks.push(raw.slice(i, i + max));
+
       const collation = {
         characters: new Map(),
         locations: new Map(),
@@ -1224,49 +1240,93 @@ export async function importRawText(
         styleSamples: [],
         ideas: [],
       };
-      const systemMsg = 'Rispondi esclusivamente con JSON valido.';
-      const focusHint = focus ? `\nFOCUS: ${focus}` : '';
+
+      const systemMsg = 'Sei un analista letterario preciso. Rispondi esclusivamente con JSON valido. Rispetta rigorosamente la distinzione tra personaggi (viventi) e oggetti/luoghi.';
+      const focusHint = focus ? `\nFOCUS SPECIFICO RICHIESTO: ${focus}` : '';
+
+      // Helper robusto per JSON repair
+      const repairAndParse = (text) => {
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          // 1. Rimuovi markdown fences
+          let clean = text.replace(/^```[a-zA-Z]*\n?|```$/g, '').trim();
+          // 2. Trova il primo { e l'ultimo }
+          const firstOpen = clean.indexOf('{');
+          const lastClose = clean.lastIndexOf('}');
+          if (firstOpen === -1 || lastClose === -1) return {};
+          clean = clean.slice(firstOpen, lastClose + 1);
+
+          // 3. Fix comuni: trailing commas
+          clean = clean.replace(/,\s*([}\]])/g, '$1');
+          // 4. Quote chiavi non quotate (spesso succede con modelli locali)
+          clean = clean.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+
+          try {
+            return JSON.parse(clean);
+          } catch (e2) {
+            console.warn("JSON repair failed 2nd attempt", e2);
+            return {};
+          }
+        }
+      };
+
       for (let ci = 0; ci < chunks.length; ci++) {
-        const prompt = `${header}${focusHint}\n\nESTRATTO ${ci + 1}/${chunks.length}:\n${chunks[ci]}`;
+        const prompt = `${header}${focusHint}\n\n--- TESTO DA ANALIZZARE (PARTE ${ci + 1}/${chunks.length}) ---\n${chunks[ci]}`;
         try {
           const { text } = await AIService.complete({
             prompt,
             system: systemMsg,
-            temperature: 0.2,
-            maxTokens: 900,
+            temperature: 0.1, // Temperatura bassa per maggiore determinismo json
+            maxTokens: 1500, // Aumentato per permettere JSON completi
           });
-          const stripped = text.replace(/^```[a-zA-Z]*\n?|```$/g, '').trim();
-          const jsonStart = stripped.indexOf('{');
-          const jsonEnd = stripped.lastIndexOf('}');
-          let body =
-            jsonStart >= 0 ? stripped.slice(jsonStart, jsonEnd + 1) : '{}';
-          body = body
-            .replace(/,\s*([}\]])/g, '$1')
-            .replace(/([,{]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-          const parsed = JSON.parse(body);
+
+          const parsed = repairAndParse(text);
+
+          // Deduplicazione "Smart": usa nome normalizzato ma arricchisci descrizione
           const addList = (lst, map, key = 'name') => {
             (lst || []).forEach(it => {
-              const k = (it?.[key] || '').toLowerCase();
-              if (!k) return;
-              const prev = map.get(k) || it;
-              map.set(k, { ...prev, ...it });
+              const rawName = it?.[key];
+              if (!rawName || typeof rawName !== 'string') return;
+              const k = rawName.toLowerCase().trim();
+              if (k.length < 2) return; // ignora rumore
+
+              const prev = map.get(k);
+
+              // Se esiste già, uniamo le descrizioni se nuove
+              let finalDesc = it.description || '';
+              if (prev && prev.description) {
+                if (it.description && !prev.description.includes(it.description.slice(0, 20))) {
+                  // Evita di accodare se sembra già presente
+                  finalDesc = prev.description.length > it.description.length ? prev.description : it.description;
+                } else {
+                  finalDesc = prev.description;
+                }
+              }
+
+              map.set(k, { ...prev, ...it, description: finalDesc });
             });
           };
+
           addList(parsed.characters, collation.characters);
           addList(parsed.locations, collation.locations);
           addList(parsed.objects, collation.objects);
           addList(parsed.geography, collation.geography);
           addList(parsed.history, collation.history);
           addList(parsed.culture, collation.culture);
-          collation.relations.push(...(parsed.relations || []));
-          collation.plotlines.push(...(parsed.plotlines || []));
+
+          if (parsed.relations) collation.relations.push(...parsed.relations);
+          if (parsed.plotlines) collation.plotlines.push(...parsed.plotlines);
           if (parsed.style) collation.styleSamples.push(parsed.style);
           if (Array.isArray(parsed.ideas))
             collation.ideas.push(
               ...parsed.ideas.filter(it => it?.title || it?.content)
             );
-        } catch {}
+        } catch (err) {
+          console.error(`Error analyzing chunk ${ci}`, err);
+        }
       }
+
       entities.characters = Array.from(collation.characters.values());
       entities.locations = Array.from(collation.locations.values());
       entities.objects = Array.from(collation.objects.values());
@@ -1275,6 +1335,8 @@ export async function importRawText(
       entities.culture = Array.from(collation.culture.values());
       relations = collation.relations;
       plotlines = collation.plotlines;
+
+      // Idee: merge
       if (
         (!ideasFromDoc || ideasFromDoc.length === 0) &&
         collation.ideas.length
@@ -1287,7 +1349,9 @@ export async function importRawText(
           return true;
         });
       }
+
       if (collation.styleSamples.length) {
+        // Simple tone voting
         const tones = {};
         for (const s of collation.styleSamples) {
           if (s?.tone) tones[s.tone] = (tones[s.tone] || 0) + 1;

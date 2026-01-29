@@ -10,10 +10,14 @@ async function renderAnalysis() {
   const projectId = await DataManager.getCurrentProjectId();
   if (!projectId) return;
 
-  const [scenes, characters, plotlines] = await Promise.all([
+  const [scenes, characters, plotlines, locations, geography, objects, culture] = await Promise.all([
     DataManager.getProjectItems(projectId, 'scenes'),
     DataManager.getProjectItems(projectId, 'characters'),
     DataManager.getProjectItems(projectId, 'plotlines'),
+    DataManager.getProjectItems(projectId, 'locations'),
+    DataManager.getProjectItems(projectId, 'geography'),
+    DataManager.getProjectItems(projectId, 'objects'),
+    DataManager.getProjectItems(projectId, 'culture'),
   ]);
 
   // Precompute ordered scenes and a quick index lookup

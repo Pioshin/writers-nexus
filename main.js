@@ -324,6 +324,49 @@ function setupEventListeners() {
   window.addEventListener('datachanged', e => {
     if (e.detail?.type === 'projects') updateActiveProjectIndicator();
   });
+
+  // Listen for Consistency Engine progress
+  window.addEventListener('consistency-progress', e => {
+    const { status, message, details } = e.detail;
+    updateConsistencyIndicator(status, message, details);
+  });
+}
+
+function updateConsistencyIndicator(status, message, details) {
+  const indicator = document.getElementById('consistency-status-indicator');
+  const msgEl = indicator.querySelector('p');
+  const detailsEl = document.getElementById('consistency-status-details');
+  const icon = indicator.querySelector('i');
+
+  if (status === 'idle') {
+    indicator.classList.remove('translate-y-0');
+    indicator.classList.add('translate-y-full');
+    return;
+  }
+
+  // Show
+  indicator.classList.remove('translate-y-full', 'hidden');
+  indicator.classList.add('translate-y-0');
+
+  if (message) msgEl.textContent = message;
+  if (details) detailsEl.textContent = details;
+
+  // Status styling
+  if (status === 'error') {
+    icon.setAttribute('data-lucide', 'alert-triangle');
+    icon.classList.remove('animate-spin', 'text-accent');
+    icon.classList.add('text-red-500');
+  } else if (status === 'complete') {
+    icon.setAttribute('data-lucide', 'check-circle');
+    icon.classList.remove('animate-spin');
+    icon.classList.add('text-green-500');
+  } else {
+    // running
+    icon.setAttribute('data-lucide', 'loader-2');
+    icon.classList.add('animate-spin', 'text-accent');
+    icon.classList.remove('text-red-500', 'text-green-500');
+  }
+  lucide.createIcons();
 }
 
 async function switchView(viewName) {

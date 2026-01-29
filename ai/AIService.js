@@ -1,42 +1,80 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Simple pluggable AI service wrapper
-// Contract:
-// - init({ provider, apiKey, baseUrl, model, headers })
-// - complete({ prompt, system, temperature, maxTokens, meta }) -> { text, raw }
-// - chat({ messages, temperature, maxTokens }) -> { text, raw }
-// - abort()
+// Worker-based AI Service
+// Handles off-loading of heavy tasks to ai.worker.js
+// Standard chat/complete calls are proxied or handled directly depending on type.
 
-let controller = null;
+let worker = null;
+let workerCallbacks = new Map();
 let config = {
-  provider: 'openai-compatible',
-  baseUrl: '',
+  provider: 'openai-compatible', // Default per compatibilità locale
+  baseUrl: 'http://127.0.0.1:11434',
   apiKey: '',
-  model: '',
+  model: 'gemma:2b',
   headers: {},
 };
 let genAI = null;
 
-function normalizeGoogleModel(model) {
-  if (!model || typeof model !== 'string') return 'gemini-1.5-flash'; // fallback sicuro
-  const m = model.trim();
+function initWorker() {
+  if (worker) return;
+  worker = new Worker(new URL('ai.worker.js', import.meta.url), { type: 'module' });
 
-  // Rimuovi prefissi "models/" se presenti
-  const cleanModel = m.startsWith('models/') ? m.replace('models/', '') : m;
+  worker.onmessage = (e) => {
+    const { type, id, result, error, message } = e.data;
 
-  // Mappature per compatibilità AI Studio
-  const modelMap = {
-    'gemini-pro': 'gemini-1.5-pro',
-    'gemini-pro-vision': 'gemini-1.5-pro',
-    // Rimuovi suffissi -latest che possono causare problemi
-    'gemini-1.5-pro-latest': 'gemini-1.5-pro',
-    'gemini-1.5-flash-latest': 'gemini-1.5-flash',
-    'gemini-1.0-pro-latest': 'gemini-1.0-pro',
-    // Varianti comuni che potrebbero non funzionare
-    'gemini-1.5-pro-002': 'gemini-1.5-pro',
-    'gemini-1.5-flash-001': 'gemini-1.5-flash',
+    // Handle Connection Check explicitly
+    if (type === 'CONNECTION_OK' || type === 'CONNECTION_ERROR') {
+      if (workerCallbacks.has(id)) {
+        const { resolve, reject } = workerCallbacks.get(id);
+        type === 'CONNECTION_OK' ? resolve(true) : reject(new Error(error));
+        workerCallbacks.delete(id);
+      }
+      return;
+    }
+
+    if (workerCallbacks.has(id)) {
+      const callbackObj = workerCallbacks.get(id);
+      const { resolve, reject, timeoutId } = callbackObj;
+
+      // Reset Watchdog on Progress
+      if (type === 'JOB_PROGRESS') {
+        // Reset timeout
+        if (timeoutId) clearTimeout(timeoutId);
+        callbackObj.timeoutId = setTimeout(() => {
+          reject(new Error('AI Analysis Timed Out (Stalled)'));
+          workerCallbacks.delete(id);
+        }, 120000); // 2 minutes inactivity allowance
+
+        // Forward progress event for UI feedback
+        window.dispatchEvent(new CustomEvent('consistency-progress', {
+          detail: { status: 'running', message: message || 'Ricezione dati...', details: 'Analisi in corso...' }
+        }));
+        return;
+      }
+
+      // Final States
+      if (type === 'JOB_COMPLETED' || type === 'JOB_FAILED') {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (type === 'JOB_COMPLETED') resolve(result);
+        else reject(new Error(error));
+
+        workerCallbacks.delete(id);
+      }
+    }
   };
 
+  // Sync initial config
+  worker.postMessage({ type: 'CONFIG', payload: config });
+}
+
+function normalizeGoogleModel(model) {
+  if (!model || typeof model !== 'string') return 'gemini-1.5-flash';
+  const m = model.trim();
+  const cleanModel = m.startsWith('models/') ? m.replace('models/', '') : m;
+  const modelMap = {
+    'gemini-pro': 'gemini-1.5-pro',
+    'gemini-1.5-flash-latest': 'gemini-1.5-flash',
+  };
   return modelMap[cleanModel] || cleanModel;
 }
 
@@ -46,241 +84,151 @@ function getHeaders() {
   return headers;
 }
 
-function initGenAI() {
-  if (config.apiKey) {
-    genAI = new GoogleGenerativeAI(config.apiKey);
-  } else {
-    console.warn('[AIService] No API Key for Gemini. Init skipped.');
-  }
-}
-
 export const AIService = {
   init(opts = {}) {
     config = { ...config, ...opts };
     if (config.provider === 'google') {
       config.model = normalizeGoogleModel(config.model);
-    }
-    if (config.provider === 'google') {
-      // The client gets the API key from the environment variable `GEMINI_API_KEY` if not passed directly.
       genAI = new GoogleGenerativeAI(config.apiKey);
     }
-    initGenAI(); // Initialize genAI client on init
+
+    // Always init worker for background tasks
+    initWorker();
+    if (worker) worker.postMessage({ type: 'CONFIG', payload: config });
   },
+
   getConfig() {
     return { ...config };
   },
-  async complete({
-    prompt,
-    system,
-    temperature = 0.7,
-    maxTokens = 800,
-    meta = {},
-  }) {
-    controller = new AbortController();
 
+  async checkConnection() {
+    if (!worker) initWorker();
+    return new Promise((resolve, reject) => {
+      const id = crypto.randomUUID();
+      workerCallbacks.set(id, { resolve, reject, timeoutId: setTimeout(() => reject(new Error("Connection check timed out")), 5000) });
+      worker.postMessage({ type: 'CHECK_CONNECTION', id });
+    });
+  },
+
+  // Standard interactive completion (still main thread for responsiveness in chat)
+  async complete({ prompt, system, temperature = 0.7, maxTokens = 800 }) {
     if (config.provider === 'google') {
-      if (!genAI)
-        throw new Error('Google AI not initialized. Call init first.');
-      const modelName = normalizeGoogleModel(config.model);
-      console.debug(
-        `[Gemini] Original model: ${config.model} → Normalized: ${modelName}`
-      );
+      if (!genAI) throw new Error('Google AI not initialized.');
+      const model = genAI.getGenerativeModel({
+        model: config.model,
+        systemInstruction: system
+      });
+      const result = await model.generateContent(prompt, {
+        generationConfig: { temperature, maxOutputTokens: maxTokens }
+      });
+      return { text: result.response.text(), raw: result.response };
+    }
 
+    // Fallback standard fetch (Ollama / OpenAI)
+    return this._fetchCompletion(prompt, system, temperature, maxTokens);
+  },
+
+  // Background optimized analysis (Worker)
+  async analyzeBackground(chunk, type = 'extraction', context = 'general') {
+    if (!worker) initWorker();
+
+    // Check connection first if using local LLM to avoid silent failures
+    if (config.provider === 'ollama') {
       try {
-        const model = genAI.getGenerativeModel({
-          model: normalizeGoogleModel(config.model), // Use normalizeGoogleModel directly
-          ...(system ? { systemInstruction: system } : {}), // Keep system instruction for complete
-        });
+        await this.checkConnection();
+      } catch (e) {
+        console.warn("AI Connection Failed:", e);
+        throw new Error("Impossibile connettersi a Ollama. Assicurati che sia attivo.");
+      }
+    }
 
-        // Gemini Multimodal input
-        let promptInput = [];
-        promptInput.push(prompt); // The 'prompt' argument is the user's text
+    const TIMEOUT_MS = 120000; // 2 minutes initial
 
-        if (inlineData) {
-          promptInput.push({
-            inlineData: {
-              data: inlineData.data,
-              mimeType: inlineData.mimeType
-            }
-          });
+    return new Promise((resolve, reject) => {
+      const id = crypto.randomUUID();
+
+      // Store callback with watchdog timer
+      workerCallbacks.set(id, {
+        resolve,
+        reject,
+        timeoutId: setTimeout(() => {
+          reject(new Error('AI Analysis Timed Out (No start)'));
+          workerCallbacks.delete(id);
+        }, TIMEOUT_MS)
+      });
+
+      worker.postMessage({
+        type: 'ENQUEUE_ANALYSIS',
+        id,
+        payload: {
+          chunk,
+          type,
+          context
         }
+      });
+    });
+  },
 
-        const result = await model.generateContent(promptInput, {
-          generationConfig: {
-            temperature,
-            maxOutputTokens: maxTokens,
-          },
-          signal: controller.signal,
-        });
-
-        const response = result.response;
-        const text = response.text();
-        return { text, raw: response };
-      } catch (error) {
-        console.error(`[Gemini] Complete Error:`, error); // Updated error message
-        throw error;
-      }
+  async chat({ messages, temperature = 0.7, maxTokens = 800 }) {
+    if (config.provider === 'google') {
+      if (!genAI) throw new Error('Google AI not initialized');
+      const model = genAI.getGenerativeModel({ model: config.model });
+      const chat = model.startChat({
+        history: messages.slice(0, -1).map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }))
+      });
+      const result = await chat.sendMessage(messages[messages.length - 1].content);
+      return { text: result.response.text() };
     }
 
+    // Std fetch
     let url = `${config.baseUrl}/chat/completions`;
-    let payload = {};
-    if (
-      config.provider === 'openai-compatible' ||
-      config.provider === 'ollama'
-    ) {
-      payload = {
-        model: config.model,
-        temperature,
-        max_tokens: maxTokens,
-        messages: [
-          system ? { role: 'system', content: system } : null,
-          { role: 'user', content: prompt },
-        ].filter(Boolean),
-      };
-      if (config.provider === 'ollama') {
-        // Ollama uses different endpoint for chat
-        url = `${config.baseUrl}/v1/chat/completions`;
-      }
-    } else if (config.provider === 'anthropic') {
-      url = `${config.baseUrl}/messages`;
-      payload = {
-        model: config.model,
-        max_tokens: maxTokens,
-        temperature,
-        messages: [{ role: 'user', content: prompt }],
-        system,
-      };
-    } else {
-      payload = meta.rawPayload ?? {};
-    }
+    if (config.provider === 'ollama') url = `${config.baseUrl}/v1/chat/completions`;
+
+    const payload = {
+      model: config.model,
+      temperature,
+      messages
+    };
+
     const res = await fetch(url, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(payload),
-      signal: controller.signal,
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error(`AI request failed (${res.status})`);
     const data = await res.json();
-    let text = '';
-    if (config.provider === 'anthropic') {
-      text = data?.content?.[0]?.text ?? '';
-    } else {
-      text = data?.choices?.[0]?.message?.content ?? data?.response ?? '';
-    }
+    const text = data?.choices?.[0]?.message?.content || "";
     return { text, raw: data };
   },
-  async chat({ messages, temperature = 0.7, maxTokens = 800, inlineData = null }) {
-    controller = new AbortController();
 
-    if (config.provider === 'google') {
-      // Attempt to initialize genAI if it's null and model is Gemini/Flash
-      if (!genAI && (config.model.includes('gemini') || config.model.includes('flash'))) {
-        initGenAI();
-      }
-      if (!genAI) {
-        throw new Error('Google AI not initialized. Call init first.');
-      }
-      const modelName = normalizeGoogleModel(config.model);
-      console.debug(
-        `[Gemini Chat] Original model: ${config.model} → Normalized: ${modelName}, messages: ${messages.length}`
-      );
-
-      try {
-        const systemMessage = messages.find(m => m.role === 'system');
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          ...(systemMessage
-            ? { systemInstruction: systemMessage.content }
-            : {}),
-        });
-
-        const history = messages
-          .filter(m => m.role !== 'system') // Rimuovi i messaggi system dalla history
-          .map(m => ({
-            role: m.role === 'assistant' ? 'model' : m.role, // Gemini usa 'model' invece di 'assistant'
-            parts: [{ text: m.content }],
-          }));
-
-        if (history.length === 0) {
-          throw new Error('No non-system messages found for chat');
-        }
-
-        const last = history[history.length - 1];
-        const prior = history.slice(0, -1);
-
-        const chat = model.startChat({
-          history: prior,
-          generationConfig: {
-            temperature,
-            maxOutputTokens: maxTokens,
-          },
-        });
-
-        const result = await chat.sendMessage(last.parts[0].text, {
-          signal: controller.signal,
-        });
-
-        const response = result.response;
-        const text = response.text();
-        return { text, raw: response };
-      } catch (error) {
-        console.error(`[Gemini Chat] Error with model ${modelName}:`, error);
-        throw error;
-      }
-    }
-
+  // Internal helper
+  async _fetchCompletion(prompt, system, temperature, maxTokens) {
     let url = `${config.baseUrl}/chat/completions`;
-    let payload = {
+    if (config.provider === 'ollama') url = `${config.baseUrl}/v1/chat/completions`;
+
+    const payload = {
       model: config.model,
       temperature,
       max_tokens: maxTokens,
-      messages,
+      messages: [
+        system ? { role: 'system', content: system } : null,
+        { role: 'user', content: prompt }
+      ].filter(Boolean)
     };
-    if (config.provider === 'anthropic') {
-      url = `${config.baseUrl}/messages`;
-      payload = {
-        model: config.model,
-        max_tokens: maxTokens,
-        temperature,
-        messages,
-      };
-    } else if (config.provider === 'ollama') {
-      url = `${config.baseUrl}/v1/chat/completions`;
-    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(payload),
-      signal: controller.signal,
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error(`AI request failed (${res.status})`);
-    const data = await res.json();
-    const text =
-      config.provider === 'anthropic'
-        ? (data?.content?.[0]?.text ?? '')
-        : (data?.choices?.[0]?.message?.content ?? '');
-    return { text, raw: data };
-  },
-  abort() {
-    if (controller) controller.abort();
-  },
-};
 
-// Helpful error hinting: wrap Google 404s with guidance
-const _origComplete = AIService.complete;
-AIService.complete = async function wrappedComplete(args) {
-  try {
-    return await _origComplete.call(AIService, args);
-  } catch (e) {
-    const msg = String(e?.message || e);
-    if (config.provider === 'google' && /404/.test(msg)) {
-      const suggestion = msg.includes('-latest')
-        ? 'I modelli con suffisso "-latest" non sono sempre supportati. Prova senza "-latest".'
-        : 'Prova modelli stabili come "gemini-1.5-flash" o "gemini-1.5-pro".';
-      throw new Error(
-        `${msg}\nSuggerimento: ${suggestion} Assicurati di usare una API Key di AI Studio (non Vertex AI).`
-      );
-    }
-    throw e;
+    if (!res.ok) throw new Error(`AI error: ${res.status}`);
+    const data = await res.json();
+    return {
+      text: data?.choices?.[0]?.message?.content || "",
+      raw: data
+    };
   }
 };
