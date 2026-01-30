@@ -197,7 +197,10 @@ export class ConsistencyEngine {
         try {
             // We check settings but we ONLY run AI if forceAI is true
             const config = await this.dataManager.getSettings();
-            if (config.aiApiKey || config.geminiKey || config.openaiKey) aiConfigured = true;
+            // Fix: Ollama might not have a key, so check provider/url too
+            if (config.aiApiKey || config.geminiKey || config.openaiKey || (config.aiProvider === 'ollama' && config.aiBaseUrl)) {
+                aiConfigured = true;
+            }
         } catch (e) { }
 
         // PHASE 1: BATCH EXTRACTION (No Saving)
@@ -395,6 +398,7 @@ export class ConsistencyEngine {
             const resultRaw = await this.aiService.analyzeBackground(JSON.stringify(uniqueNames), 'consolidation');
 
             // Result should be the raw JSON string (or text containing JSON)
+            console.log("Consolidation AI Output (Raw):", resultRaw);
             let jsonString = resultRaw.replace(/```json|```/g, '').trim();
 
             const firstBracket = jsonString.indexOf('[');

@@ -68,7 +68,10 @@ async function runAnalysisStep(payload, jobId) {
     let systemMsg = "Rispondi esclusivamente con JSON valido e completo.";
 
     if (type === 'extraction') {
-        systemMsg += " Usa un formato TOON minimizzato (key: n=name, d=desc, r=role). Non aggiungere testo prima o dopo il JSON.";
+        systemMsg += " Format: JSON { c: [{n,d,r}], l: [{n,d}], o: [{n,d}], k: [{n,d}] } where c=chars, l=locs, o=objs, k=knowledge. Key map: n=name, d=desc, r=role. " +
+            "RULES: 1. precision: 'n' must be a Proper Name (Capitalized). Ignore verbs, measurements (e.g. '10°'), dates or common nouns. " +
+            "2. brevity: 'd' max 10 words. " +
+            "3. output: pure JSON only.";
     }
 
     if (type === 'consolidation') {
@@ -161,10 +164,15 @@ async function callLLM(prompt, system, jobId) {
                             // User wants EVIDENCE. Sending "token received" is good evidence.
                             // But postMessage is expensive. Send every 10 tokens?
                             // Minimal: Send update every 1s? Or just rely on visual activity if we forward chunk length.
-                            // Let's send a progress update every 50 characters accumulated this turn.
-                            if (fullText.length % 50 < content.length) { // Crude throttle
-                                self.postMessage({ type: 'JOB_PROGRESS', id: jobId, message: 'Elaborazione in corso...', count: fullText.length });
-                            }
+                            // Send EVERY token chunk for smooth Matrix UI (or throttle slightly if very fast)
+                            // Sending every chunk allows "typing" effect.
+                            self.postMessage({
+                                type: 'JOB_PROGRESS',
+                                id: jobId,
+                                message: 'Elaborazione...',
+                                token: content, // The raw token for display
+                                count: fullText.length
+                            });
                         }
                     } catch (e) {
                         // ignore parse errors for partial chunks

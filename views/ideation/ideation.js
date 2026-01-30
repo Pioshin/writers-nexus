@@ -1157,7 +1157,7 @@ export default {
       renderConsistencyIssues(e.detail.issues, e.detail.aiStatus);
     });
 
-    // Debug Log Listener
+    // Debug Log Listener - Updated for Streaming Monitor
     window.addEventListener('consistency-log', e => {
       const logContainer = document.getElementById('debug-log-content');
       if (logContainer) {
@@ -1170,6 +1170,21 @@ export default {
       }
     });
 
+    // --- STREAMING MONITOR LISTENER ---
+    // Listens for 'token' field in consistency-progress
+    window.addEventListener('consistency-progress', e => {
+      const termContent = document.getElementById('streaming-terminal-content');
+      if (termContent && e.detail.token) {
+        // Append data
+        const span = document.createElement('span');
+        span.textContent = e.detail.token;
+        span.className = 'text-green-400 font-mono animate-pulse-fast'; // Matrix effect
+        termContent.appendChild(span);
+        // Auto scroll
+        termContent.scrollTop = termContent.scrollHeight;
+      }
+    });
+
     // --- Restore Log History if returning to view ---
     if (window.consistencyEngine && typeof window.consistencyEngine.getLogHistory === 'function') {
       const history = window.consistencyEngine.getLogHistory(); // [newest, ..., oldest]
@@ -1177,14 +1192,6 @@ export default {
 
       if (logContainer && history.length > 0) {
         logContainer.innerHTML = '';
-        // We want Newest on Top.
-        // If we loop [A(new), B(old)] and prepend:
-        // 1. Prepend A -> [A]
-        // 2. Prepend B -> [B, A] -> Wrong order (Oldest on top?)
-        // Wait, prepend inserts before first child.
-        // If we want [A, B], we should prepend B then A?
-        // Yes. So iterate from end (Oldest) to start (Newest).
-
         for (let i = history.length - 1; i >= 0; i--) {
           const entry = history[i];
           const { message, type, timestamp } = entry;
@@ -1196,6 +1203,260 @@ export default {
         }
       }
     }
+
+
+    // Call Terminal Render
+    if (window.renderStreamingTerminal) window.renderStreamingTerminal();
   },
 };
+
+// --- TERMINAL UI INJECTION (Helper) ---
+window.renderStreamingTerminal = () => {
+  // Check if duplicate
+  if (document.getElementById('streaming-monitor-panel')) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'streaming-monitor-panel';
+  panel.className = 'hidden fixed bottom-4 right-4 w-96 bg-black/95 border border-green-500/50 rounded-lg shadow-2xl z-50 flex flex-col font-mono text-xs';
+  panel.style.height = '300px';
+  panel.style.boxShadow = '0 0 20px rgba(0, 255, 0, 0.2)';
+
+  panel.innerHTML = `
+        <div class="flex items-center justify-between p-2 border-b border-green-500/30 bg-green-900/20">
+            <div class="flex items-center gap-2 text-green-400">
+                <i data-lucide="terminal" class="w-4 h-4"></i>
+                <span class="font-bold tracking-wider">AI NEURAL LINK</span>
+            </div>
+            <div class="flex items-center gap-2">
+                 <button onclick="document.getElementById('streaming-terminal-content').innerHTML = ''" class="text-green-600 hover:text-green-300 transition-colors" title="Clear">
+                    <i data-lucide="eraser" class="w-3 h-3"></i>
+                </button>
+                <button onclick="document.getElementById('streaming-monitor-panel').classList.add('hidden')" class="text-green-600 hover:text-green-300 transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+        <div id="streaming-terminal-content" class="flex-1 p-3 overflow-y-auto text-green-300/90 break-words leading-relaxed scrollbar-thin scrollbar-thumb-green-900/50 font-mono">
+           <div class="opacity-50 italic text-green-700">> Waiting for neural signal...</div>
+        </div>
+        <div class="p-1 border-t border-green-500/20 bg-black text-[9px] text-green-600/50 text-center uppercase tracking-widest">
+            Writers Nexus // Quantum Core v2.1
+        </div>
+    `;
+  document.body.appendChild(panel);
+
+  // Add Toggle Button
+  if (!document.getElementById('toggle-matrix-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'toggle-matrix-btn';
+    btn.className = 'fixed bottom-4 right-4 bg-black/90 text-green-500 border border-green-500/50 p-3 rounded-full hover:bg-green-900/30 hover:scale-110 hover:shadow-[0_0_15px_rgba(0,255,0,0.4)] transition-all duration-300 z-40 shadow-lg group';
+    btn.title = "Open Neural Monitor";
+    btn.innerHTML = `<i data-lucide="activity" class="w-5 h-5 group-hover:animate-pulse"></i>`;
+
+    btn.onclick = () => {
+      const p = document.getElementById('streaming-monitor-panel');
+      p.classList.remove('hidden');
+      btn.classList.add('hidden'); // Hide toggle when open
+      // Animation 
+      p.classList.remove('animate-in');
+      void p.offsetWidth; // trigger reflow
+      p.classList.add('animate-in', 'slide-in-from-bottom-10', 'fade-in');
+    };
+    // Hook close to show toggle
+    const closeBtn = panel.querySelector('button[onclick*="hidden"]');
+    closeBtn.onclick = () => {
+      panel.classList.add('hidden');
+      btn.classList.remove('hidden');
+    };
+
+    document.body.appendChild(btn);
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+};
+
+// --- DATA INSPECTOR UI (Helper) ---
+window.renderDataInspector = async () => {
+  // SINGLETON CHECK (Removed immediate return to allow refresh, but check panel existence)
+  let panel = document.getElementById('data-inspector-panel');
+  if (panel) panel.remove(); // Force rebuild to refresh data
+
+  // Fetch Scene Data via Consistency Engine or direct DataManager
+  if (!window.consistencyEngine || !window.consistencyEngine.dataManager) {
+    if (window.toast) window.toast.error("Engine non pronto.");
+    return;
+  }
+
+  const projectId = window.consistencyEngine.currentProjectId;
+  if (!projectId) {
+    if (window.toast) window.toast.error("Nessun progetto attivo.");
+    return;
+  }
+
+  // Show loading?
+  if (window.toast) window.toast.info("Caricamento dati scene...");
+  const scenes = await window.consistencyEngine.dataManager.getProjectItems(projectId, 'scenes');
+
+  panel = document.createElement('div');
+  panel.id = 'data-inspector-panel';
+  panel.className = 'hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm';
+
+  // Sort scenes: Analyzed first, then by title
+  scenes.sort((a, b) => {
+    const aHas = !!(a.extractedEntities && a.extractedEntities.length > 0);
+    const bHas = !!(b.extractedEntities && b.extractedEntities.length > 0);
+    if (aHas === bHas) return a.title.localeCompare(b.title);
+    return bHas ? 1 : -1;
+  });
+
+  const rows = scenes.map(s => {
+    const hasData = s.extractedEntities && s.extractedEntities.length > 0;
+    const count = hasData ? s.extractedEntities.length : 0;
+    const source = s.extractionSource || '-';
+    const hash = s.contentHash ? s.contentHash.substring(0, 8) + '...' : 'N/A';
+
+    return `
+            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                <td class="p-2 text-primary font-medium">${s.title}</td>
+                <td class="p-2 text-xs text-secondary font-mono">${hash}</td>
+                <td class="p-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] ${hasData ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">
+                        ${hasData ? 'ANALIZZATA' : 'PENDING'}
+                    </span>
+                </td>
+                 <td class="p-2 text-xs text-secondary">${source.toUpperCase()}</td>
+                <td class="p-2 text-right">
+                    <span class="text-white font-bold">${count}</span> <span class="text-xs text-secondary">entità</span>
+                </td>
+                <td class="p-2 text-right">
+                    <button onclick="window.clearSceneData('${s.id}')" class="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10" title="Resetta Analisi">
+                        <i data-lucide="refresh-ccw" class="w-3 h-3"></i>
+                    </button>
+                     <button onclick="window.showSceneJSON('${s.id}')" class="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-blue-500/10" title="Vedi JSON">
+                        <i data-lucide="code" class="w-3 h-3"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+  }).join('');
+
+  panel.innerHTML = `
+        <div class="bg-gray-900 border border-white/10 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="p-4 border-b border-white/10 flex items-center justify-between bg-black/40">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                        <i data-lucide="database" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Database Inspector</h3>
+                        <p class="text-xs text-secondary">Stato Memoria Scene & Checkpoint</p>
+                    </div>
+                </div>
+                <button onclick="document.getElementById('data-inspector-panel').classList.add('hidden')" class="text-secondary hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="overflow-auto flex-1 p-0">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-white/5 text-xs uppercase text-secondary sticky top-0 backdrop-blur-md">
+                        <tr>
+                            <th class="p-3">Scena</th>
+                            <th class="p-3">Hash Contenuto</th>
+                            <th class="p-3">Stato</th>
+                             <th class="p-3">Fonte</th>
+                            <th class="p-3 text-right">Dati Estratti</th>
+                            <th class="p-3 text-right">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="p-3 border-t border-white/10 bg-black/40 text-xs text-secondary flex justify-between">
+                <span>Totale Scene: ${scenes.length}</span>
+                <span>Scene Analizzate: ${scenes.filter(s => s.extractedEntities?.length > 0).length}</span>
+            </div>
+        </div>
+    `;
+
+  // Helpers available globally for buttons
+  window.clearSceneData = async (sceneId) => {
+    if (!confirm('Vuoi davvero cancellare i dati AI di questa scena? Verrà rianalizzata al prossimo giro.')) return;
+    const scene = scenes.find(s => s.id === sceneId);
+    if (scene) {
+      delete scene.extractedEntities;
+      delete scene.extractionSource;
+      delete scene.contentHash;
+      await window.consistencyEngine.dataManager.saveProjectItem(projectId, 'scenes', scene);
+      // Rebuild
+      window.renderDataInspector();
+      setTimeout(() => document.getElementById('data-inspector-panel').classList.remove('hidden'), 50);
+    }
+  };
+
+  window.showSceneJSON = (id) => {
+    const scene = scenes.find(s => s.id === id);
+    if (!scene || !scene.extractedEntities) return;
+
+    // Remove old modal if any
+    const old = document.getElementById('json-viewer-modal');
+    if (old) old.remove();
+
+    const m = document.createElement('div');
+    m.id = 'json-viewer-modal';
+    m.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-200';
+    m.innerHTML = `
+            <div class="bg-gray-900 border border-white/10 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+                <div class="p-3 border-b border-white/10 flex justify-between items-center bg-black/50">
+                    <h3 class="font-mono text-sm text-green-400">JSON: ${scene.title}</h3>
+                    <button onclick="this.closest('#json-viewer-modal').remove()" class="text-white hover:text-red-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+                <div class="flex-1 overflow-auto p-4 bg-black/80 font-mono text-xs text-gray-300">
+                    <pre>${JSON.stringify(scene.extractedEntities, null, 2)}</pre>
+                </div>
+                 <div class="p-2 border-t border-white/10 bg-black/50 text-right">
+                    <button onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.textContent); window.toast.success('Copiato!')" class="text-xs text-secondary hover:text-white px-2 py-1 rounded border border-white/10">Copia</button>
+                </div>
+            </div>
+        `;
+    document.body.appendChild(m);
+    if (window.lucide) window.lucide.createIcons();
+  };
+
+  document.body.appendChild(panel);
+
+  // Auto-show
+  if (window.lucide) window.lucide.createIcons();
+  panel.classList.remove('hidden');
+};
+
+// Add Toggle for Inspector
+window.renderDataInspector.toggle = () => {
+  const p = document.getElementById('data-inspector-panel');
+  if (p) {
+    if (p.classList.contains('hidden')) {
+      window.renderDataInspector();
+    }
+    else p.classList.add('hidden');
+  } else {
+    window.renderDataInspector();
+  }
+};
+
+// Inject Inspector Button next to Matrix Button
+setTimeout(() => {
+  if (!document.getElementById('toggle-inspector-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'toggle-inspector-btn';
+    btn.className = 'fixed bottom-4 right-20 bg-black/90 text-purple-400 border border-purple-500/50 p-3 rounded-full hover:bg-purple-900/30 hover:scale-110 transition-all z-40 shadow-lg';
+    btn.title = "Open Data Inspector";
+    btn.innerHTML = `<i data-lucide="database" class="w-5 h-5"></i>`;
+    btn.onclick = window.renderDataInspector.toggle;
+    document.body.appendChild(btn);
+    if (window.lucide) window.lucide.createIcons();
+  }
+}, 1000);
 

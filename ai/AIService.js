@@ -46,8 +46,14 @@ function initWorker() {
         }, 120000); // 2 minutes inactivity allowance
 
         // Forward progress event for UI feedback
+        // Pass 'token' for live streaming monitor
         window.dispatchEvent(new CustomEvent('consistency-progress', {
-          detail: { status: 'running', message: message || 'Ricezione dati...', details: 'Analisi in corso...' }
+          detail: {
+            status: 'running',
+            message: message || 'Ricezione dati...',
+            details: 'Analisi in corso...',
+            token: e.data.token // Raw token from LLM
+          }
         }));
         return;
       }

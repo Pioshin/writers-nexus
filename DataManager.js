@@ -155,6 +155,56 @@ export const DataManager = {
     );
   },
 
+  async importProjectData(jsonData) {
+    const db = await getDb();
+
+    // Validation
+    if (!jsonData.project || !jsonData.project.id || !jsonData.project.title) {
+      throw new Error("Formato backup non valido: Project data mancante.");
+    }
+
+    const projectId = jsonData.project.id;
+    const projectTitle = jsonData.project.title;
+
+    // Transaction
+    const tx = db.transaction(STORE_NAMES, 'readwrite');
+
+    // 1. Save/Overwrite Project
+    await tx.objectStore('projects').put(jsonData.project);
+
+    // 2. Clear & Restore related stores
+    // We iterate over all stores except 'projects' and 'settings'
+    const storesToRestore = STORE_NAMES.filter(s => s !== 'projects' && s !== 'settings');
+
+    for (const storeName of storesToRestore) {
+      const store = tx.objectStore(storeName);
+      const index = store.index('by_projectId');
+
+      // Delete existing items for this project
+      // Note: index.iterate() is async iterator
+      // Efficient way: getAllKeys, then delete? Or cursor delete.
+      const keys = await index.getAllKeys(projectId);
+      for (const key of keys) {
+        await store.delete(key);
+      }
+
+      // Restore new items
+      const items = jsonData[storeName] || [];
+      for (const item of items) {
+        // Sanity check: ensure projectId matches
+        if (!item.projectId) item.projectId = projectId;
+        await store.put(item);
+      }
+    }
+
+    await tx.done;
+
+    // Switch to imported project
+    await this.setCurrentProjectId(projectId);
+
+    return projectTitle;
+  },
+
   async getSettings() {
     const db = await getDb();
     let settings = await db.get('settings', 'user_settings');

@@ -292,6 +292,71 @@ function setupEventListeners() {
   openAiBtn?.addEventListener('click', () => aiAssistantModal?.open?.());
   openImportBtn?.addEventListener('click', () => importTextModal?.open?.());
 
+  // --- EXPORT / IMPORT HANDLERS ---
+  const exportBtn = document.getElementById('export-project-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', async () => {
+      if (isOfflineMode && !confirm("Sei Offline. L'export funziona, ma ricorda di sincronizzare quando tornerai online.")) { }
+
+      const projectId = await DataManager.getCurrentProjectId();
+      if (!projectId) {
+        uiNotifier.showStatus("Nessun progetto attivo da esportare.", { isError: true, autoClose: 3000 });
+        return;
+      }
+
+      uiNotifier.showStatus("Preparazione backup...", { isLoading: true });
+      try {
+        const data = await DataManager.getProjectData(projectId);
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backup-${data.project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        uiNotifier.showStatus("Backup scaricato!", { autoClose: 2000 });
+      } catch (e) {
+        console.error(e);
+        uiNotifier.showStatus("Errore durante l'export.", { isError: true, autoClose: 4000 });
+      }
+    });
+  }
+
+  const importBtn = document.getElementById('import-project-btn');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const json = JSON.parse(evt.target.result);
+            const title = json.project?.title || 'Sconosciuto';
+
+            if (await window.appConfirm(`Vuoi importare il progetto "${title}"?\nATTENZIONE: Se esiste già un progetto con questo ID, verrà sovrascritto completamente.`, { title: 'Conferma Importazione', confirmText: 'Importa e Sovrascrivi' })) {
+              uiNotifier.showStatus("Importazione in corso...", { isLoading: true });
+              await DataManager.importProjectData(json);
+              uiNotifier.showStatus("Progetto importato!", { autoClose: 2000 });
+              setTimeout(() => window.location.reload(), 1000);
+            }
+          } catch (err) {
+            console.error(err);
+            uiNotifier.showStatus("Errore importazione: " + err.message, { isError: true, autoClose: 5000 });
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    });
+  }
+
   loginForm.addEventListener('submit', async e => {
     e.preventDefault();
     if (isOfflineMode) return;
@@ -334,6 +399,8 @@ function setupEventListeners() {
 
 function updateConsistencyIndicator(status, message, details) {
   const indicator = document.getElementById('consistency-status-indicator');
+  if (!indicator) return; // Exit if indicator doesn't exist (e.g. not in Dashboard)
+
   const msgEl = indicator.querySelector('p');
   const detailsEl = document.getElementById('consistency-status-details');
   const icon = indicator.querySelector('i');
@@ -348,10 +415,12 @@ function updateConsistencyIndicator(status, message, details) {
   indicator.classList.remove('translate-y-full', 'hidden');
   indicator.classList.add('translate-y-0');
 
-  if (message) msgEl.textContent = message;
-  if (details) detailsEl.textContent = details;
+  if (message && msgEl) msgEl.textContent = message;
+  if (details && detailsEl) detailsEl.textContent = details;
 
   // Status styling
+  if (!icon) return; // Prevent crash if icon missing
+
   if (status === 'error') {
     icon.setAttribute('data-lucide', 'alert-triangle');
     icon.classList.remove('animate-spin', 'text-accent');

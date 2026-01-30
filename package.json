@@ -1,5 +1,6 @@
 {
   "type": "module",
+  "version": "0.1.0-alpha",
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "eslint-plugin-html": "^8.1.3",
