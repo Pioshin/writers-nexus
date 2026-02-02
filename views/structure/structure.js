@@ -1,4 +1,4 @@
-let DataManager, FirebaseSync, loadModal, switchView;
+let DataManager, loadModal, switchView;
 let currentProjectId;
 let sceneEditorModal = null;
 const UNASSIGNED_KEY = 'unassigned';
@@ -26,9 +26,8 @@ const HERO_JOURNEY_STAGES = {
   ],
 };
 
-async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
+async function init(dataManager, modalLoader, viewSwitcher) {
   DataManager = dataManager;
-  FirebaseSync = firebaseSync;
   loadModal = modalLoader;
   switchView = viewSwitcher;
 

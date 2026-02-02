@@ -16,7 +16,6 @@ const STORE_NAMES = [
 ];
 
 let dbPromise = null;
-let firebaseSync = null;
 let uiNotifier = null;
 
 function generateId(prefix = 'item') {
@@ -28,7 +27,6 @@ function getDb() {
     dbPromise = idb.openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
         console.log(`Upgrading DB from ${oldVersion} to ${DB_VERSION}`);
-        // Create stores if missing (handles all upgrade paths)
         STORE_NAMES.forEach(storeName => {
           if (!db.objectStoreNames.contains(storeName)) {
             const store = db.createObjectStore(storeName, { keyPath: 'id' });
@@ -43,31 +41,15 @@ function getDb() {
   return dbPromise;
 }
 
-async function getAllLocalData() {
-  const db = await getDb();
-  const allData = {};
-  for (const storeName of STORE_NAMES) {
-    allData[storeName] = await db.getAll(storeName);
-  }
-  return allData;
-}
-
 export const DataManager = {
-  init(fs, notifier) {
-    firebaseSync = fs;
+  init(notifier) {
     uiNotifier = notifier;
   },
 
-  // ... (sync methods remain the same) ...
-
-  // --- Metodi per le Scene ---
+  // --- Scene Methods ---
   async getScenesForStage(projectId, stageKey) {
     const db = await getDb();
-    const allScenes = await db.getAllFromIndex(
-      'scenes',
-      'by_projectId',
-      projectId
-    );
+    const allScenes = await db.getAllFromIndex('scenes', 'by_projectId', projectId);
     return allScenes
       .filter(scene => scene.stageKey === stageKey)
       .sort((a, b) => a.order - b.order);
@@ -83,7 +65,6 @@ export const DataManager = {
     const id = sceneData.id || generateId('scene');
     const now = Date.now();
 
-    // Ensure projectId is set
     if (!sceneData.projectId) {
       sceneData.projectId = await this.getCurrentProjectId();
     }
@@ -106,12 +87,11 @@ export const DataManager = {
     await db.delete('scenes', sceneId);
   },
 
-  // --- Metodi per Progetti e Impostazioni ---
+  // --- Project Data Export/Import ---
   async getProjectData(projectId) {
     const db = await getDb();
     const data = { projectId, exportedAt: new Date().toISOString() };
 
-    // Serial execution to avoid saturating IDB
     for (const store of STORE_NAMES) {
       if (store === 'settings') continue;
       if (store === 'projects') {
@@ -129,10 +109,12 @@ export const DataManager = {
     const db = await getDb();
     const tx = db.transaction(STORE_NAMES, 'readwrite');
     await tx.objectStore('projects').delete(id);
+
     const scenesIndex = tx.objectStore('scenes').index('by_projectId');
     for await (const cursor of scenesIndex.iterate(id)) {
       await cursor.delete();
     }
+
     const itemStores = STORE_NAMES.filter(
       s => s !== 'projects' && s !== 'settings' && s !== 'scenes'
     );
@@ -143,68 +125,136 @@ export const DataManager = {
       }
     }
     await tx.done;
-    // Se il progetto cancellato era quello corrente, azzera le impostazioni correnti
+
     const settings = await this.getSettings();
     if (settings.currentProjectId === id) {
       await this.saveSettings({ currentProjectId: null, currentSceneId: null });
     }
 
-    // Dispatch change event
     window.dispatchEvent(
       new CustomEvent('datachanged', { detail: { storeName: 'projects' } })
     );
   },
 
-  async importProjectData(jsonData) {
+  async importProjectData(jsonData, options = {}) {
+    const { maxItems = 5000, overwrite = true } = options;
     const db = await getDb();
 
-    // Validation
+    // Validazione struttura base
+    if (!jsonData || typeof jsonData !== 'object') {
+      throw new Error("Formato non valido: il file deve contenere un oggetto JSON.");
+    }
     if (!jsonData.project || !jsonData.project.id || !jsonData.project.title) {
-      throw new Error("Formato backup non valido: Project data mancante.");
+      throw new Error("Formato non valido: manca il campo 'project' con 'id' e 'title'.");
     }
 
     const projectId = jsonData.project.id;
     const projectTitle = jsonData.project.title;
 
-    // Transaction
+    // Verifica se il progetto esiste già
+    const existingProject = await db.get('projects', projectId);
+    if (existingProject && !overwrite) {
+      throw new Error(`Il progetto "${projectTitle}" esiste già. Usa overwrite:true per sovrascrivere.`);
+    }
+
+    // Validazione dimensione (protezione da file enormi)
+    let totalItems = 0;
+    const storesToValidate = STORE_NAMES.filter(s => s !== 'projects' && s !== 'settings');
+    for (const storeName of storesToValidate) {
+      const items = jsonData[storeName];
+      if (Array.isArray(items)) {
+        totalItems += items.length;
+        if (totalItems > maxItems) {
+          throw new Error(`File troppo grande: superato il limite di ${maxItems} elementi totali.`);
+        }
+        // Valida che ogni item abbia un id
+        for (const item of items) {
+          if (!item.id) {
+            throw new Error(`Elemento senza id trovato in ${storeName}.`);
+          }
+        }
+      }
+    }
+
+    // Sanitizza il progetto
+    const projectToSave = {
+      ...jsonData.project,
+      id: projectId,
+      importedAt: Date.now(),
+      lastModified: Date.now()
+    };
+
     const tx = db.transaction(STORE_NAMES, 'readwrite');
 
-    // 1. Save/Overwrite Project
-    await tx.objectStore('projects').put(jsonData.project);
+    await tx.objectStore('projects').put(projectToSave);
 
-    // 2. Clear & Restore related stores
-    // We iterate over all stores except 'projects' and 'settings'
-    const storesToRestore = STORE_NAMES.filter(s => s !== 'projects' && s !== 'settings');
-
-    for (const storeName of storesToRestore) {
+    for (const storeName of storesToValidate) {
       const store = tx.objectStore(storeName);
       const index = store.index('by_projectId');
 
-      // Delete existing items for this project
-      // Note: index.iterate() is async iterator
-      // Efficient way: getAllKeys, then delete? Or cursor delete.
+      // Pulisci dati esistenti per questo progetto
       const keys = await index.getAllKeys(projectId);
       for (const key of keys) {
         await store.delete(key);
       }
 
-      // Restore new items
+      // Inserisci nuovi dati
       const items = jsonData[storeName] || [];
       for (const item of items) {
-        // Sanity check: ensure projectId matches
-        if (!item.projectId) item.projectId = projectId;
-        await store.put(item);
+        const sanitizedItem = {
+          ...item,
+          projectId: projectId,
+          lastModified: item.lastModified || Date.now()
+        };
+        await store.put(sanitizedItem);
       }
     }
 
     await tx.done;
 
-    // Switch to imported project
     await this.setCurrentProjectId(projectId);
 
-    return projectTitle;
+    return { title: projectTitle, itemCount: totalItems };
   },
 
+  // Export tutti i progetti
+  async exportAllProjects() {
+    const projects = await this.getProjects();
+    const allData = {
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      projectCount: projects.length,
+      projects: []
+    };
+
+    for (const project of projects) {
+      const projectData = await this.getProjectData(project.id);
+      allData.projects.push(projectData);
+    }
+
+    return allData;
+  },
+
+  // Import tutti i progetti da backup completo
+  async importAllProjects(jsonData, options = {}) {
+    if (!jsonData.projects || !Array.isArray(jsonData.projects)) {
+      throw new Error("Formato non valido: manca l'array 'projects'.");
+    }
+
+    const results = [];
+    for (const projectData of jsonData.projects) {
+      try {
+        const result = await this.importProjectData(projectData, options);
+        results.push({ success: true, ...result });
+      } catch (e) {
+        results.push({ success: false, error: e.message, title: projectData?.project?.title || 'Unknown' });
+      }
+    }
+
+    return results;
+  },
+
+  // --- Settings ---
   async getSettings() {
     const db = await getDb();
     let settings = await db.get('settings', 'user_settings');
@@ -215,7 +265,6 @@ export const DataManager = {
         currentProjectId: null,
         currentSceneId: null,
         lastModified: Date.now(),
-        // IA defaults
         aiProvider: 'openai-compatible',
         aiBaseUrl: '',
         aiModel: '',
@@ -237,7 +286,6 @@ export const DataManager = {
     };
     await db.put('settings', newSettings);
 
-    // Dispatch change event
     window.dispatchEvent(
       new CustomEvent('settingschanged', { detail: { newSettings } })
     );
@@ -254,7 +302,7 @@ export const DataManager = {
     await this.saveSettings({
       currentProjectId: projectId,
       currentSceneId: null,
-    }); // Reset scene when project changes
+    });
   },
 
   async getCurrentSceneId() {
@@ -265,155 +313,21 @@ export const DataManager = {
   async setCurrentSceneId(sceneId) {
     await this.saveSettings({ currentSceneId: sceneId });
   },
-};
 
-// Fill in the other existing methods to keep the object complete
-Object.assign(DataManager, {
-  async sync() {
-    if (
-      !firebaseSync ||
-      !uiNotifier ||
-      !(await firebaseSync.checkConnection())
-    ) {
-      console.log('Sync skipped: Firebase not connected or configured.');
-      uiNotifier.showStatus('Modalità offline', { autoClose: 3000 });
-      return;
-    }
-    uiNotifier.showStatus('Verifica dati remoti...', { isloading: true });
-    const remoteTs = await firebaseSync.getRemoteTimestamps();
-    const localData = await getAllLocalData();
-    if (!remoteTs) {
-      uiNotifier.showStatus('Errore nel recupero dati remoti.', {
-        isError: true,
-        autoClose: 5000,
-      });
-      return;
-    }
-    const comparison = this._compareTimestamps(localData, remoteTs);
-    uiNotifier.closeStatus();
-    switch (comparison.status) {
-      case 'REMOTE_EMPTY':
-        uiNotifier.showStatus(
-          'Nessun dato remoto, carico la versione locale...',
-          { isLoading: true }
-        );
-        await this.uploadLocalData();
-        uiNotifier.showStatus('Dati locali caricati con successo!', {
-          autoClose: 3000,
-        });
-        break;
-      case 'SYNCED':
-        uiNotifier.showStatus('Dati sincronizzati.', { autoClose: 2000 });
-        break;
-      case 'LOCAL_NEWER':
-        uiNotifier.showConflict('LOCAL_NEWER', comparison.diff);
-        break;
-      case 'REMOTE_NEWER':
-        uiNotifier.showConflict('REMOTE_NEWER', comparison.diff);
-        break;
-      case 'DIVERGED':
-        uiNotifier.showConflict('DIVERGED', comparison.diff);
-        break;
-    }
-  },
-  _compareTimestamps(localData, remoteTs) {
-    let localNewerCount = 0;
-    let remoteNewerCount = 0;
-    const diff = { local: [], remote: [] };
-    STORE_NAMES.forEach(store => {
-      const localItems = localData[store] || [];
-      const remoteItems = remoteTs[store] || {};
-      localItems.forEach(item => {
-        const remoteTimestamp = remoteItems[item.id];
-        if (!remoteTimestamp) {
-          localNewerCount++;
-          diff.local.push(item.id);
-        } else if (item.lastModified > remoteTimestamp) {
-          localNewerCount++;
-          diff.local.push(item.id);
-        }
-      });
-      Object.keys(remoteItems).forEach(id => {
-        const localItem = localItems.find(item => item.id === id);
-        if (!localItem) {
-          remoteNewerCount++;
-          diff.remote.push(id);
-        } else if (remoteItems[id] > localItem.lastModified) {
-          remoteNewerCount++;
-          diff.remote.push(id);
-        }
-      });
-    });
-    if (localNewerCount === 0 && remoteNewerCount === 0)
-      return { status: 'SYNCED' };
-    const isRemoteEmpty = Object.values(remoteTs).every(
-      s => Object.keys(s).length === 0
-    );
-    if (isRemoteEmpty) return { status: 'REMOTE_EMPTY' };
-    if (localNewerCount > 0 && remoteNewerCount === 0)
-      return { status: 'LOCAL_NEWER', diff };
-    if (remoteNewerCount > 0 && localNewerCount === 0)
-      return { status: 'REMOTE_NEWER', diff };
-    return { status: 'DIVERGED', diff };
-  },
-  async uploadLocalData() {
-    uiNotifier.showStatus('Caricamento dati su server...', { isLoading: true });
-    const result = await firebaseSync.uploadData(this);
-    if (result.success) {
-      uiNotifier.showStatus('Caricamento completato!', { autoClose: 3000 });
-    } else {
-      uiNotifier.showStatus(`Errore: ${result.error}`, {
-        isError: true,
-        autoClose: 5000,
-      });
-    }
-  },
-  async downloadRemoteData() {
-    uiNotifier.showStatus('Scaricando dati dal server...', { isLoading: true });
-    const remoteData = await firebaseSync.downloadData();
-    if (remoteData) {
-      const db = await getDb();
-      const tx = db.transaction(STORE_NAMES, 'readwrite');
-      for (const storeName of STORE_NAMES) {
-        await tx.objectStore(storeName).clear();
-        for (const item of remoteData[storeName]) {
-          await tx.objectStore(storeName).put(item);
-        }
-      }
-      await tx.done;
-      uiNotifier.showStatus('Dati scaricati e aggiornati localmente!', {
-        autoClose: 3000,
-      });
-      window.location.reload();
-    } else {
-      uiNotifier.showStatus('Errore durante il download.', {
-        isError: true,
-        autoClose: 5000,
-      });
-    }
-  },
-  async syncOnClose() {
-    if (!firebaseSync || !(await firebaseSync.checkConnection())) return;
-    const remoteTs = await firebaseSync.getRemoteTimestamps();
-    const localData = await getAllLocalData();
-    const comparison = this._compareTimestamps(localData, remoteTs);
-    if (comparison.status === 'LOCAL_NEWER') {
-      console.log('Syncing on close: local data is newer, uploading.');
-      await firebaseSync.uploadData(this);
-    }
-  },
+  // --- Projects CRUD ---
   async getProjects() {
     const db = await getDb();
     return db.getAll('projects');
   },
+
   async getProject(id) {
     const db = await getDb();
     return db.get('projects', id);
   },
+
   async saveProject(projectData) {
     const db = await getDb();
 
-    // Check for duplicates
     const allProjects = await this.getProjects();
     if (
       allProjects.some(
@@ -433,19 +347,20 @@ Object.assign(DataManager, {
     }
     await db.put('projects', project);
 
-    // Dispatch change event
     window.dispatchEvent(
       new CustomEvent('datachanged', { detail: { storeName: 'projects' } })
     );
 
-    // Aggiorna anche il progetto corrente nelle impostazioni
     await this.setCurrentProjectId(id);
     return project;
   },
+
+  // --- Project Items CRUD ---
   async getProjectItems(projectId, itemType) {
     const db = await getDb();
     return db.getAllFromIndex(itemType, 'by_projectId', projectId);
   },
+
   async saveProjectItem(projectId, itemType, itemData) {
     const db = await getDb();
     const id = itemData.id || generateId(itemType.slice(0, 4));
@@ -455,14 +370,13 @@ Object.assign(DataManager, {
     await db.put(itemType, item);
     return item;
   },
+
   async deleteProjectItem(itemType, itemId) {
     const db = await getDb();
     await db.delete(itemType, itemId);
   },
-});
 
-// Helpers per import sostitutivo: pulizia dati per progetto
-Object.assign(DataManager, {
+  // --- Helpers for project store cleanup ---
   async clearProjectStore(projectId, storeName) {
     const db = await getDb();
     const tx = db.transaction(storeName, 'readwrite');
@@ -472,9 +386,10 @@ Object.assign(DataManager, {
     }
     await tx.done;
   },
+
   async clearProjectStores(projectId, storeNames) {
     for (const s of storeNames) {
       await this.clearProjectStore(projectId, s);
     }
   },
-});
+};

@@ -2,13 +2,7 @@ import { DataManager } from '../../DataManager.js';
 import { toast } from '../shared/toast.js';
 import { AIService } from '../../ai/AIService.js';
 
-let modal,
-  form,
-  saveBtn,
-  cancelBtn,
-  geminiApiKeyInput,
-  firebaseConfigTextarea,
-  jsonError;
+let modal, form, saveBtn, cancelBtn;
 let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
 let genericModelContainer, googleModelContainer, configGoogleModelSelect;
 let refreshGoogleModelsBtn, googleModelsStatusEl;
@@ -18,9 +12,6 @@ function init() {
   form = document.getElementById('config-form');
   saveBtn = document.getElementById('save-config-btn');
   cancelBtn = document.getElementById('cancel-config-modal');
-  geminiApiKeyInput = document.getElementById('config-geminiApiKey');
-  firebaseConfigTextarea = document.getElementById('config-firebase-json');
-  jsonError = document.getElementById('config-json-error');
   aiBaseUrlInput = document.getElementById('config-ai-baseurl');
   aiModelInput = document.getElementById('config-ai-model');
   aiApiKeyInput = document.getElementById('config-ai-apikey');
@@ -30,13 +21,13 @@ function init() {
   configGoogleModelSelect = document.getElementById('config-google-model');
   refreshGoogleModelsBtn = document.getElementById('refresh-google-models');
   googleModelsStatusEl = document.getElementById('google-models-status');
-  const testConnectionBtn = document.getElementById('test-connection-btn'); // New
+  const testConnectionBtn = document.getElementById('test-connection-btn');
 
   cancelBtn.addEventListener('click', close);
   saveBtn.addEventListener('click', save);
   aiProviderSelect.addEventListener('change', updateAIProviderUI);
   refreshGoogleModelsBtn?.addEventListener('click', loadGoogleModels);
-  testConnectionBtn?.addEventListener('click', testConnection); // New
+  testConnectionBtn?.addEventListener('click', testConnection);
 }
 
 async function testConnection() {
@@ -44,22 +35,17 @@ async function testConnection() {
   if (testBtn) { testBtn.textContent = 'Testing...'; testBtn.disabled = true; }
 
   const provider = aiProviderSelect.value;
-  const baseUrl = aiBaseUrlInput.value.replace(/\/$/, ''); // Remove trailing slash
-  const model = aiModelInput.value;
+  const baseUrl = aiBaseUrlInput.value.replace(/\/$/, '');
 
   try {
     let url;
     if (provider === 'ollama') {
-      // For Ollama, we can try to list tags or just ping
-      // Standard Ollama endpoint for tags is GET /api/tags
-      // But if user set standard OpenAI-compat URL (v1), we check models there
       if (baseUrl.includes('/v1')) {
         url = `${baseUrl}/models`;
       } else {
-        url = `${baseUrl}/api/tags`; // Direct Ollama
+        url = `${baseUrl}/api/tags`;
       }
     } else {
-      // OpenAI Format
       url = `${baseUrl}/models`;
     }
 
@@ -88,14 +74,6 @@ function updateAIProviderUI() {
 
 async function open() {
   const settings = await DataManager.getSettings();
-  geminiApiKeyInput.value = settings.geminiApiKey || '';
-  if (settings.firebaseConfig) {
-    firebaseConfigTextarea.value = JSON.stringify(
-      settings.firebaseConfig,
-      null,
-      2
-    );
-  }
   if (aiProviderSelect)
     aiProviderSelect.value = settings.aiProvider || 'openai-compatible';
   if (aiBaseUrlInput) aiBaseUrlInput.value = settings.aiBaseUrl || '';
@@ -103,10 +81,8 @@ async function open() {
   if (configGoogleModelSelect)
     configGoogleModelSelect.value = settings.aiModel || 'gemini-1.5-flash';
   if (aiApiKeyInput)
-    aiApiKeyInput.value = settings.aiApiKey || settings.geminiApiKey || '';
-  jsonError.textContent = '';
-  updateAIProviderUI(); // Set initial UI state
-  // Se provider Google, prova a caricare la lista modelli
+    aiApiKeyInput.value = settings.aiApiKey || '';
+  updateAIProviderUI();
   if (aiProviderSelect?.value === 'google') {
     await loadGoogleModels();
   }
@@ -119,51 +95,30 @@ function close() {
 
 async function save(e) {
   if (e) e.preventDefault();
-  const geminiKey = geminiApiKeyInput.value.trim();
-  const firebaseConfigStr = firebaseConfigTextarea.value.trim();
-  let firebaseConfig;
-
-  jsonError.textContent = '';
-
-  if (firebaseConfigStr) {
-    try {
-      firebaseConfig = JSON.parse(firebaseConfigStr);
-    } catch (e) {
-      jsonError.textContent = 'Errore: Il JSON di Firebase non è valido.';
-      return;
-    }
-  }
 
   const provider = aiProviderSelect?.value || 'openai-compatible';
   const model =
     provider === 'google'
       ? configGoogleModelSelect.value
       : aiModelInput?.value.trim() || '';
-  // Preferred AI API key field. If provider is Google and explicit aiApiKey is empty, use geminiKey for aiApiKey too.
-  const typedApiKey = aiApiKeyInput?.value.trim() || '';
-  const effectiveAiApiKey =
-    provider === 'google' ? typedApiKey || geminiKey : typedApiKey;
+  const apiKey = aiApiKeyInput?.value.trim() || '';
 
   await DataManager.saveSettings({
-    geminiApiKey: geminiKey,
-    firebaseConfig: firebaseConfig, // Sarà undefined se la stringa è vuota, che è ok
     aiProvider: provider,
     aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
     aiModel: model,
-    aiApiKey: effectiveAiApiKey,
+    aiApiKey: apiKey,
   });
 
-  // Hot Reload AI Service
   AIService.init({
     provider: provider,
-    apiKey: effectiveAiApiKey,
+    apiKey: apiKey,
     baseUrl: aiBaseUrlInput?.value.trim() || '',
     model: model
   });
 
   close();
-  toast.success('Configurazione salvata e applicata.');
-  // Removed explicit reload: setTimeout(() => location.reload(), 600);
+  toast.success('Configurazione AI salvata.');
 }
 
 export default { init, open, close };
@@ -172,19 +127,14 @@ export default { init, open, close };
 function normalizeGoogleModel(model) {
   if (!model || typeof model !== 'string') return 'gemini-1.5-flash';
   const m = model.trim();
-
-  // Rimuovi prefissi "models/" se presenti
   const cleanModel = m.startsWith('models/') ? m.replace('models/', '') : m;
 
-  // Mappature per compatibilità AI Studio (stesso mapping di AIService.js)
   const modelMap = {
     'gemini-pro': 'gemini-1.5-pro',
     'gemini-pro-vision': 'gemini-1.5-pro',
-    // Rimuovi suffissi -latest che possono causare problemi
     'gemini-1.5-pro-latest': 'gemini-1.5-pro',
     'gemini-1.5-flash-latest': 'gemini-1.5-flash',
     'gemini-1.0-pro-latest': 'gemini-1.0-pro',
-    // Varianti comuni che potrebbero non funzionare
     'gemini-1.5-pro-002': 'gemini-1.5-pro',
     'gemini-1.5-flash-001': 'gemini-1.5-flash',
   };
@@ -194,8 +144,7 @@ function normalizeGoogleModel(model) {
 
 async function loadGoogleModels() {
   if (!googleModelContainer || !configGoogleModelSelect) return;
-  const apiKey =
-    aiApiKeyInput?.value?.trim() || geminiApiKeyInput?.value?.trim() || '';
+  const apiKey = aiApiKeyInput?.value?.trim() || '';
   googleModelsStatusEl.textContent = 'Caricamento modelli…';
   configGoogleModelSelect.innerHTML =
     '<option value="" disabled>Carica modelli...</option>';
@@ -205,7 +154,6 @@ async function loadGoogleModels() {
     return;
   }
   try {
-    // Endpoint pubblico AI Studio models list
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
     );
@@ -220,7 +168,6 @@ async function loadGoogleModels() {
       .map(n => normalizeGoogleModel(n))
       .filter((v, i, a) => a.indexOf(v) === i);
 
-    // Mantieni selezione precedente, fallback se vuota
     const prev = configGoogleModelSelect.value;
     const defaultModels = [
       'gemini-1.5-flash',

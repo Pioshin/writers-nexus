@@ -1,9 +1,8 @@
-let DataManager, FirebaseSync, loadModal;
+let DataManager, loadModal;
 
 export default {
-  init: function (dataManager, firebaseSync, modalLoader) {
+  init: function (dataManager, modalLoader) {
     DataManager = dataManager;
-    FirebaseSync = firebaseSync;
     loadModal = modalLoader;
 
     // Add any specific event listeners or logic for the editing view here

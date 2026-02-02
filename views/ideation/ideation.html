@@ -57,6 +57,23 @@
           <input type="file" id="memvid-upload" accept="video/mp4,video/quicktime" class="hidden">
         </label>
       </h3>
+
+      <!-- Analysis Progress Panel -->
+      <div id="analysis-progress-panel"
+        class="hidden mb-4 p-4 bg-gradient-to-r from-accent/10 to-blue-500/10 border border-accent/30 rounded-lg animate-fade-in">
+        <div class="flex justify-between items-center mb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="loader" class="w-4 h-4 text-accent animate-spin"></i>
+            <span id="progress-text" class="text-sm font-semibold text-primary">Analisi: 0/0 scene</span>
+          </div>
+          <span id="progress-time" class="text-xs text-secondary">Tempo stimato: --</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+        </div>
+        <div id="progress-current-scene" class="text-xs text-secondary mt-2 truncate"></div>
+      </div>
+
       <div id="ideation-alerts-list" class="space-y-3">
         <!-- Alerts injected here -->
       </div>

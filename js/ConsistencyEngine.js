@@ -13,6 +13,15 @@ export class ConsistencyEngine {
             this.checkAbandonedPlotlines.bind(this),
             this.checkEmptyScenes.bind(this)
         ];
+
+        // Progress tracking for chunked analysis
+        this.analysisProgress = {
+            total: 0,
+            completed: 0,
+            currentScene: null,
+            startTime: null,
+            isPaused: false
+        };
     }
 
     log(msg, type = 'info') {
@@ -45,6 +54,25 @@ export class ConsistencyEngine {
     broadcastProgress(status, message = '', details = '') {
         window.dispatchEvent(new CustomEvent('consistency-progress', {
             detail: { status, message, details }
+        }));
+    }
+
+    /**
+     * Broadcasts detailed progress for scene-by-scene analysis with time estimates
+     */
+    broadcastDetailedProgress() {
+        const elapsed = Date.now() - this.analysisProgress.startTime;
+        const avgPerScene = this.analysisProgress.completed > 0
+            ? elapsed / this.analysisProgress.completed
+            : 30000; // default 30s estimate per scene
+        const remaining = (this.analysisProgress.total - this.analysisProgress.completed) * avgPerScene;
+
+        window.dispatchEvent(new CustomEvent('analysis-progress', {
+            detail: {
+                ...this.analysisProgress,
+                elapsedMs: elapsed,
+                estimatedRemainingMs: remaining
+            }
         }));
     }
 
@@ -158,6 +186,10 @@ export class ConsistencyEngine {
 
             // 2. Run immediately
             await this.run({ forceAI: true });
+
+            // 3. Reset AI status to indicate completion
+            this.aiStatus = 'online';
+            this.broadcastIssues(); // Re-broadcast with updated status
             this.toast('Analisi completata!', 'success');
 
         } catch (e) {
@@ -208,6 +240,18 @@ export class ConsistencyEngine {
         const rawEntitiesBatch = []; // [{ sceneId, entities: [] }]
         let scenesUpdatedCount = 0;
 
+        // Initialize progress tracking
+        const scenesToAnalyze = context.scenes.filter(s => s.content && s.content.length >= 50);
+        this.analysisProgress = {
+            total: scenesToAnalyze.length,
+            completed: 0,
+            currentScene: null,
+            startTime: Date.now(),
+            isPaused: false,
+            isActive: false  // Will be set to true when first scene analysis starts
+        };
+        // Don't broadcast yet - wait until analysis actually starts
+
         for (const scene of context.scenes) {
             if (!scene.content || scene.content.length < 50) continue;
 
@@ -222,14 +266,26 @@ export class ConsistencyEngine {
                 // Try AI
                 if (forceAI && aiConfigured) {
                     try {
-                        this.log(`[Consistency] Analisi AI (${scene.title})...`, 'info');
-                        this.broadcastProgress('running', `Analisi AI: ${scene.title}`, 'Estrazione entità in corso...');
+                        // Update progress tracking - mark as active on first scene
+                        if (!this.analysisProgress.isActive) {
+                            this.analysisProgress.isActive = true;
+                            this.analysisProgress.startTime = Date.now(); // Reset timer on actual start
+                        }
+                        this.analysisProgress.currentScene = scene.title;
+                        this.broadcastDetailedProgress();
+
+                        this.log(`[Consistency] Analisi AI (${scene.title}) [${this.analysisProgress.completed + 1}/${this.analysisProgress.total}]...`, 'info');
+                        this.broadcastProgress('running', `Analisi AI: ${scene.title} (${this.analysisProgress.completed + 1}/${this.analysisProgress.total})`, 'Estrazione entità in corso...');
 
                         const result = await this.analyzeSceneWithAI(scene.content, context.projectTitle, true); // worker=true
                         if (result) {
                             sceneEntities = result;
                             source = 'ai';
                         }
+
+                        // Increment completed count after successful analysis
+                        this.analysisProgress.completed++;
+                        this.broadcastDetailedProgress();
                     } catch (e) {
                         console.error(`AI Analysis failed for ${scene.title}`, e);
                         // Fallback to empty if AI fails but was forced? Or heuristic?
@@ -378,6 +434,11 @@ export class ConsistencyEngine {
                 }
             });
         }
+
+        // Broadcast that analysis is complete (to hide progress panel)
+        this.analysisProgress.isActive = false;
+        this.analysisProgress.currentScene = null;
+        this.broadcastDetailedProgress();
 
         return issues;
     }

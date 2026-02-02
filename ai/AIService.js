@@ -43,7 +43,7 @@ function initWorker() {
         callbackObj.timeoutId = setTimeout(() => {
           reject(new Error('AI Analysis Timed Out (Stalled)'));
           workerCallbacks.delete(id);
-        }, 120000); // 2 minutes inactivity allowance
+        }, 300000); // 5 minutes inactivity allowance for slow local models
 
         // Forward progress event for UI feedback
         // Pass 'token' for live streaming monitor
@@ -148,7 +148,7 @@ export const AIService = {
       }
     }
 
-    const TIMEOUT_MS = 120000; // 2 minutes initial
+    const TIMEOUT_MS = 300000; // 5 minutes initial for slow local models
 
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();

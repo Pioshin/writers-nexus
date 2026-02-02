@@ -1,10 +1,9 @@
 <div id="config-modal" class="modal-backdrop hidden">
   <div class="bg-secondary w-full max-w-2xl rounded-2xl p-8 border border-accent/20 flex flex-col">
-    <h3 class="text-2xl font-display mb-4">Configurazione Backend</h3>
+    <h3 class="text-2xl font-display mb-4">Configurazione AI</h3>
     <p class="text-secondary mb-6 text-sm">
-      Incolla qui l'oggetto di configurazione del tuo progetto Firebase e le
-      chiavi/API dell'assistente IA che desideri usare. I dati vengono salvati
-      solo nel tuo browser.
+      Configura il provider IA che desideri usare. I dati vengono salvati
+      solo nel tuo browser (IndexedDB locale).
     </p>
     <form id="config-form" class="flex-grow overflow-y-auto pr-4 space-y-3">
       <section class="space-y-2">
@@ -52,18 +51,6 @@
           </div>
         </div>
       </section>
-      <div>
-        <label for="config-firebase-json" class="text-sm font-semibold text-secondary">Configurazione Firebase
-          (JSON)</label>
-        <textarea id="config-firebase-json" rows="8" placeholder='{ "apiKey": "...", "authDomain": "...", ... }'
-          class="w-full p-3 bg-primary border border-accent/30 rounded-lg text-sm font-mono"></textarea>
-        <p id="config-json-error" class="text-red-400 text-xs h-4"></p>
-        <hr class="border-accent/20 my-4" />
-      </div>
-      <label for="config-geminiApiKey" class="text-sm font-semibold text-secondary">Chiave API Gemini</label>
-      <input type="password" id="config-geminiApiKey"
-        placeholder="Google Gemini: API Key (opzionale, usata se selezioni Google)"
-        class="w-full px-4 py-2 bg-primary border border-accent/30 rounded-lg text-sm" />
     </form>
     <div class="flex justify-end gap-4 mt-6 pt-4 border-t border-accent/20">
       <button type="button" id="cancel-config-modal" class="px-6 py-2 bg-primary rounded-lg hover:bg-opacity-80">

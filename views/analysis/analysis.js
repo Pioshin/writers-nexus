@@ -1,5 +1,5 @@
 import { toast } from '../shared/toast.js';
-let DataManager, FirebaseSync, loadModal;
+let DataManager, loadModal;
 let charts = { hero: null, pie: null };
 
 function wordsCount(text) {
@@ -443,9 +443,8 @@ async function renderAnalysis() {
 }
 
 export default {
-  init: function (dataManager, firebaseSync, modalLoader) {
+  init: function (dataManager, modalLoader) {
     DataManager = dataManager;
-    FirebaseSync = firebaseSync;
     loadModal = modalLoader;
     document
       .getElementById('refresh-analysis')

@@ -65,18 +65,22 @@ async function processQueue() {
 
 async function runAnalysisStep(payload, jobId) {
     const { chunk, type, context } = payload;
-    let systemMsg = "Rispondi esclusivamente con JSON valido e completo.";
+
+    // Debug logging
+    console.log(`[AI Worker] Job ${jobId} - Type: ${type}, Chunk length: ${chunk?.length || 0}, Config:`, config);
 
     if (type === 'extraction') {
-        systemMsg += " Format: JSON { c: [{n,d,r}], l: [{n,d}], o: [{n,d}], k: [{n,d}] } where c=chars, l=locs, o=objs, k=knowledge. Key map: n=name, d=desc, r=role. " +
-            "RULES: 1. precision: 'n' must be a Proper Name (Capitalized). Ignore verbs, measurements (e.g. '10°'), dates or common nouns. " +
-            "2. brevity: 'd' max 10 words. " +
-            "3. output: pure JSON only.";
+        // Prompt compatto stile TOON - più efficiente per modelli locali
+        const systemMsg = `Output JSON only. Extract entities from narrative text. Format: {"c":[{"n":"Name","d":"desc","r":"role"}],"l":[{"n":"Name","d":"desc"}],"o":[{"n":"Name","d":"desc"}],"k":[{"n":"Name","d":"desc"}]} where c=characters,l=locations,o=objects,k=concepts. n=proper name, d=max 10 words, r=narrative role. Skip dates/numbers.`;
+
+        const userPrompt = `TEXT:\n${chunk}\n\nJSON:`;
+
+        return await callLLM(userPrompt, systemMsg, jobId);
     }
 
     if (type === 'consolidation') {
-        systemMsg = "Sei un editor esperto. Rispondi esclusivamente con JSON valido e completo.";
-        const listStr = chunk; // The stringified list of entities
+        const systemMsg = "Sei un editor esperto. Rispondi esclusivamente con JSON valido e completo.";
+        const listStr = chunk;
         const prompt = `
         TASK: Consolidate and Categorize this list of entities extracted from a novel.
         INPUT LIST: ${listStr}
@@ -89,12 +93,8 @@ async function runAnalysisStep(payload, jobId) {
         return await callLLM(prompt, systemMsg, jobId);
     }
 
-    // Call API logic with streaming support monitoring
-    const response = await callLLM(chunk, systemMsg, jobId);
-
-    // Validate JSON roughly before returning?
-    // If empty or invalid, it might throw later, but here we just return text.
-    return response;
+    // Fallback for unknown types
+    return await callLLM(chunk, "Rispondi in modo conciso.", jobId);
 }
 
 // Streaming-enabled fetch wrapper
@@ -132,6 +132,7 @@ async function callLLM(prompt, system, jobId) {
         const decoder = new TextDecoder("utf-8");
         let fullText = "";
         let buffer = "";
+        let processedIds = new Set(); // Track processed message IDs to avoid duplicates
 
         // Report initial contact
         self.postMessage({ type: 'JOB_PROGRESS', id: jobId, message: 'Connesso, ricezione dati...' });
@@ -149,28 +150,33 @@ async function callLLM(prompt, system, jobId) {
 
             for (const line of lines) {
                 const trimmed = line.trim();
+                if (!trimmed) continue; // Skip empty lines
+
                 if (trimmed.startsWith('data: ')) {
-                    const dataStr = trimmed.replace('data: ', '').trim();
+                    const dataStr = trimmed.substring(6).trim(); // More efficient than replace
                     if (dataStr === '[DONE]') continue;
 
                     try {
                         const json = JSON.parse(dataStr);
+
+                        // Skip if we've already processed this response ID (prevents duplicates)
+                        const msgId = json.id || json.created;
+                        const chunkIdx = json.choices?.[0]?.index ?? 0;
+                        const uniqueKey = `${msgId}-${chunkIdx}-${json.choices?.[0]?.delta?.content?.length || 0}`;
+
+                        if (msgId && processedIds.has(uniqueKey)) {
+                            continue; // Skip duplicate
+                        }
+                        if (msgId) processedIds.add(uniqueKey);
+
                         const content = json.choices?.[0]?.delta?.content || "";
                         if (content) {
                             fullText += content;
-                            // Heartbeat: report progress every ~50 chars or just "Alive"
-                            // To avoid spamming main thread, maybe throttle?
-                            // For now, let's just send 'Alive' signal occasionally or purely implicitly?
-                            // User wants EVIDENCE. Sending "token received" is good evidence.
-                            // But postMessage is expensive. Send every 10 tokens?
-                            // Minimal: Send update every 1s? Or just rely on visual activity if we forward chunk length.
-                            // Send EVERY token chunk for smooth Matrix UI (or throttle slightly if very fast)
-                            // Sending every chunk allows "typing" effect.
                             self.postMessage({
                                 type: 'JOB_PROGRESS',
                                 id: jobId,
                                 message: 'Elaborazione...',
-                                token: content, // The raw token for display
+                                token: content,
                                 count: fullText.length
                             });
                         }
@@ -181,10 +187,21 @@ async function callLLM(prompt, system, jobId) {
             }
         }
 
+        // Process any remaining buffer
+        if (buffer.trim() && buffer.trim().startsWith('data: ')) {
+            try {
+                const dataStr = buffer.trim().substring(6).trim();
+                if (dataStr !== '[DONE]') {
+                    const json = JSON.parse(dataStr);
+                    const content = json.choices?.[0]?.delta?.content || "";
+                    if (content) fullText += content;
+                }
+            } catch (e) { /* ignore */ }
+        }
+
         return fullText;
 
     } catch (e) {
-        // Fallback for non-streaming providers or errors?
         // If streaming failed, throw.
         throw e;
     }

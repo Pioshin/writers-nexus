@@ -23,7 +23,7 @@ let stageBadgeEl,
 import { StageUndo } from '../shared/stage-undo.js';
 const WORDS_PER_PAGE = 300;
 
-async function init(dataManager, firebaseSync, modalLoader, viewSwitcher) {
+async function init(dataManager, modalLoader, viewSwitcher) {
   DataManager = dataManager;
   switchView = viewSwitcher;
 

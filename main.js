@@ -1,47 +1,36 @@
 
 import { DataManager } from './DataManager.js';
-import { FirebaseSync } from './FirebaseSync.js';
 import { ThemeManager } from './ThemeManager.js';
 import { AIService } from './ai/AIService.js';
 import { AIPanel } from './ai/AIPanel.js';
-import { ConsistencyEngine } from './js/ConsistencyEngine.js'; // Import engine
+import { ConsistencyEngine } from './js/ConsistencyEngine.js';
 
 // --- STATE ---
-let isOfflineMode = false;
 let syncModal = null;
 let configModal = null;
 let importTextModal = null;
-let consistencyEngine; // Added
-let currentView = 'dashboard'; // Added
-let OverlayModule; // Added
+let consistencyEngine;
+let currentView = 'dashboard';
+let OverlayModule;
 
 // --- DOM ELEMENT VARIABLES ---
-let authScreen,
-  appScreen,
+let appScreen,
   mainNav,
   mainContentArea,
   viewContainer,
   themeSelector,
-  showConfigBtn,
   sidebarSettingsBtn,
-  loginForm,
-  logoutBtn,
-  userEmailEl,
-  loginSubmitBtn,
-  authErrorEl,
-  userInfoEl,
-  configStatusEl,
   modalContainer,
   currentProjectNameEl;
 let openAiBtn;
 let openImportBtn;
-let mobileMenuBtn, sidebar, mobileOverlay; // Mobile menu vars
+let mobileMenuBtn, sidebar, mobileOverlay;
 let aiAssistantModal;
 let confirmModal;
 
 // --- RACE CONTROL / AI CONFIG CACHE ---
-let currentViewToken = 0; // Incremental token per prevenire race condition nei caricamenti vista
-let lastAIConfig = null; // Cache configurazione AI per re-init selettivo
+let currentViewToken = 0;
+let lastAIConfig = null;
 
 // --- UI NOTIFIER ---
 const uiNotifier = {
@@ -51,7 +40,7 @@ const uiNotifier = {
   ) {
     if (!syncModal) return;
     syncModal.show({
-      title: isError ? 'Errore' : 'Stato Sincronizzazione',
+      title: isError ? 'Errore' : 'Stato',
       message,
       isLoading,
       secondaryBtnText: 'Chiudi',
@@ -59,39 +48,6 @@ const uiNotifier = {
     if (autoClose > 0) {
       setTimeout(() => syncModal.hide(), autoClose);
     }
-  },
-  showConflict(status, diff) {
-    if (!syncModal) return;
-    let title, message, primaryBtnText, onPrimary;
-
-    switch (status) {
-      case 'LOCAL_NEWER':
-        title = 'Modifiche Locali Rilevate';
-        message = `Hai ${diff.local.length} modifiche non sincronizzate.Vuoi caricarle ora ? `;
-        primaryBtnText = 'Carica Modifiche';
-        onPrimary = () => DataManager.uploadLocalData();
-        break;
-      case 'REMOTE_NEWER':
-        title = 'Dati Remoti Più Recenti';
-        message = `Ci sono ${diff.remote.length} aggiornamenti sul server.Vuoi scaricarli ora ? (Le modifiche locali non sincronizzate verranno perse)`;
-        primaryBtnText = 'Scarica Dati';
-        onPrimary = () => DataManager.downloadRemoteData();
-        break;
-      case 'DIVERGED':
-        title = 'Dati Divergenti';
-        message = `Hai ${diff.local.length} modifiche locali e ${diff.remote.length} modifiche remote.Scegli quale versione mantenere.`;
-        primaryBtnText = 'Mantieni Dati Remoti';
-        onPrimary = () => DataManager.downloadRemoteData();
-        break;
-    }
-
-    syncModal.show({
-      title,
-      message,
-      primaryBtnText,
-      onPrimary,
-      secondaryBtnText: 'Decidi più tardi',
-    });
   },
   closeStatus() {
     if (syncModal) syncModal.hide();
@@ -103,28 +59,17 @@ document.addEventListener('DOMContentLoaded', initializeApp);
 
 async function initializeApp() {
   // Assign DOM variables
-  authScreen = document.getElementById('auth-screen');
   appScreen = document.getElementById('app-screen');
   mainNav = document.getElementById('main-nav');
-  mainNav = document.getElementById('main-nav');
   mainContentArea = document.getElementById('main-content-area');
-  viewContainer = document.getElementById('view-container') || mainContentArea; // Fallback
+  viewContainer = document.getElementById('view-container') || mainContentArea;
   themeSelector = document.getElementById('theme-selector');
-  showConfigBtn = document.getElementById('show-config-btn');
   sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
-  // Mobile menu
   mobileMenuBtn = document.getElementById('mobile-menu-btn');
   sidebar = document.getElementById('sidebar');
   mobileOverlay = document.getElementById('mobile-overlay');
   openAiBtn = document.getElementById('open-ai-assistant');
   openImportBtn = document.getElementById('open-import-text');
-  loginForm = document.getElementById('login-form');
-  logoutBtn = document.getElementById('logout-btn');
-  userEmailEl = document.getElementById('user-email');
-  loginSubmitBtn = document.getElementById('login-submit-btn');
-  authErrorEl = document.getElementById('auth-error');
-  userInfoEl = document.getElementById('user-info');
-  configStatusEl = document.getElementById('config-status');
   modalContainer = document.getElementById('modal-container');
   currentProjectNameEl = document.getElementById('current-project-name');
 
@@ -135,11 +80,9 @@ async function initializeApp() {
   window.aiPanel = new AIPanel(DataManager);
 
   // Init Consistency Engine
-  // Assuming 'toast' is a global function or object available, or needs to be imported/defined.
-  // For now, using a placeholder if not defined elsewhere.
-  const toast = window.toast || console.log; // Placeholder for toast function
-  consistencyEngine = new ConsistencyEngine(DataManager, toast, AIService); // Pass AIService
-  window.consistencyEngine = consistencyEngine; // Expose globally for views
+  const toast = window.toast || console.log;
+  consistencyEngine = new ConsistencyEngine(DataManager, toast, AIService);
+  window.consistencyEngine = consistencyEngine;
   consistencyEngine.init();
 
   // Pre-load modals
@@ -150,7 +93,8 @@ async function initializeApp() {
   importTextModal = await loadModal('import-text');
 
   setupEventListeners();
-  DataManager.init(FirebaseSync, uiNotifier);
+  DataManager.init(uiNotifier);
+
   // Esponi un helper globale per conferme custom
   window.appConfirm = async (message, opts = {}) => {
     try {
@@ -165,11 +109,10 @@ async function initializeApp() {
   // Set initial UI states
   await updateActiveProjectIndicator();
 
-  // Init AI with settings (cache per confronti futuri)
+  // Init AI with settings
   const initialAI = {
     provider: settings.aiProvider || 'openai-compatible',
     baseUrl: settings.aiBaseUrl || '',
-    // Backward-compat: prefer aiApiKey, fallback to legacy geminiApiKey
     apiKey: settings.aiApiKey || settings.geminiApiKey || '',
     model: settings.aiModel || '',
     headers: settings.aiHeaders || {},
@@ -177,25 +120,9 @@ async function initializeApp() {
   AIService.init(initialAI);
   lastAIConfig = { ...initialAI };
 
-  if (settings.firebaseConfig && settings.firebaseConfig.apiKey) {
-    const initResult = await FirebaseSync.initFirebase(settings.firebaseConfig);
-    if (initResult.success) {
-      configStatusEl.textContent = 'Firebase Configurato.';
-      configStatusEl.className =
-        'text-center text-xs p-2 rounded-lg bg-green-500/20 text-green-300';
-      setupAuthObserver();
-    } else {
-      configStatusEl.textContent = `Errore Firebase: ${initResult.error} `;
-      configStatusEl.className =
-        'text-center text-xs p-2 rounded-lg bg-red-500/20 text-red-300';
-      launchOfflineMode();
-    }
-  } else {
-    configStatusEl.textContent = 'Firebase non configurato.';
-    configStatusEl.className =
-      'text-center text-xs p-2 rounded-lg bg-yellow-500/20 text-yellow-300';
-    launchOfflineMode();
-  }
+  // Avvio diretto - nessun auth richiesto
+  appScreen.classList.remove('hidden');
+  switchView('dashboard');
 }
 
 async function updateActiveProjectIndicator() {
@@ -215,54 +142,11 @@ async function updateActiveProjectIndicator() {
   }
 }
 
-function launchOfflineMode() {
-  isOfflineMode = true;
-  console.log('Avvio in modalità offline.');
-  authScreen.classList.add('hidden');
-  appScreen.classList.remove('hidden');
-  userInfoEl.innerHTML = `<p class="text-xs text-secondary">Modalità offline</p>`;
-  userInfoEl.style.display = 'flex';
-  logoutBtn.style.display = 'none';
-  switchView('dashboard');
-}
-
-function setupAuthObserver() {
-  FirebaseSync.onAuthStateChanged(async user => {
-    if (user) {
-      isOfflineMode = false;
-      authScreen.classList.add('hidden');
-      appScreen.classList.remove('hidden');
-      userEmailEl.textContent = user.email;
-      userInfoEl.style.display = 'flex';
-      logoutBtn.style.display = 'block';
-
-      const settings = await DataManager.getSettings();
-      ThemeManager.applyTheme(settings.theme || 'scifi');
-
-      try {
-        await DataManager.sync();
-      } catch (error) {
-        console.error('Sync failed on startup:', error);
-        uiNotifier.showStatus(
-          'Sincronizzazione iniziale fallita. Controlla la console.',
-          { isError: true, autoClose: 5000 }
-        );
-      }
-
-      switchView('dashboard');
-    } else {
-      authScreen.classList.remove('hidden');
-      appScreen.classList.add('hidden');
-    }
-  });
-}
-
 function setupEventListeners() {
   mainNav.addEventListener('click', e => {
     const navItem = e.target.closest('.nav-item');
     if (navItem && navItem.dataset.view) {
       switchView(navItem.dataset.view);
-      // Close mobile menu on navigate
       if (window.innerWidth < 768) {
         closeMobileMenu();
       }
@@ -280,7 +164,6 @@ function setupEventListeners() {
     mobileOverlay.addEventListener('click', closeMobileMenu);
   }
 
-  showConfigBtn.addEventListener('click', () => configModal?.open());
   // Shortcut per aprire l'assistente IA
   window.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -288,7 +171,7 @@ function setupEventListeners() {
       aiAssistantModal?.open?.();
     }
   });
-  sidebarSettingsBtn.addEventListener('click', () => configModal?.open());
+  sidebarSettingsBtn?.addEventListener('click', () => configModal?.open());
   openAiBtn?.addEventListener('click', () => aiAssistantModal?.open?.());
   openImportBtn?.addEventListener('click', () => importTextModal?.open?.());
 
@@ -296,8 +179,6 @@ function setupEventListeners() {
   const exportBtn = document.getElementById('export-project-btn');
   if (exportBtn) {
     exportBtn.addEventListener('click', async () => {
-      if (isOfflineMode && !confirm("Sei Offline. L'export funziona, ma ricorda di sincronizzare quando tornerai online.")) { }
-
       const projectId = await DataManager.getCurrentProjectId();
       if (!projectId) {
         uiNotifier.showStatus("Nessun progetto attivo da esportare.", { isError: true, autoClose: 3000 });
@@ -311,7 +192,9 @@ function setupEventListeners() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `backup-${data.project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${Date.now()}.json`;
+        const dateStr = new Date().toISOString().split('T')[0];
+        const title = data.project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `writers-nexus-${title}-${dateStr}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -334,6 +217,12 @@ function setupEventListeners() {
         const file = e.target.files[0];
         if (!file) return;
 
+        // Limite 10MB
+        if (file.size > 10 * 1024 * 1024) {
+          uiNotifier.showStatus("File troppo grande (max 10MB).", { isError: true, autoClose: 4000 });
+          return;
+        }
+
         const reader = new FileReader();
         reader.onload = async (evt) => {
           try {
@@ -342,9 +231,9 @@ function setupEventListeners() {
 
             if (await window.appConfirm(`Vuoi importare il progetto "${title}"?\nATTENZIONE: Se esiste già un progetto con questo ID, verrà sovrascritto completamente.`, { title: 'Conferma Importazione', confirmText: 'Importa e Sovrascrivi' })) {
               uiNotifier.showStatus("Importazione in corso...", { isLoading: true });
-              await DataManager.importProjectData(json);
-              uiNotifier.showStatus("Progetto importato!", { autoClose: 2000 });
-              setTimeout(() => window.location.reload(), 1000);
+              const result = await DataManager.importProjectData(json);
+              uiNotifier.showStatus(`Progetto "${result.title}" importato (${result.itemCount} elementi)!`, { autoClose: 3000 });
+              setTimeout(() => window.location.reload(), 1500);
             }
           } catch (err) {
             console.error(err);
@@ -357,34 +246,8 @@ function setupEventListeners() {
     });
   }
 
-  loginForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    if (isOfflineMode) return;
-    loginSubmitBtn.disabled = true;
-    authErrorEl.textContent = '';
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    const result = await FirebaseSync.login(email, password);
-    if (!result.success) {
-      authErrorEl.textContent = 'Credenziali errate.';
-      loginSubmitBtn.disabled = false;
-    }
-  });
-
-  logoutBtn.addEventListener('click', async () => {
-    if (isOfflineMode) return;
-    await FirebaseSync.logout();
-  });
-
-  window.addEventListener('beforeunload', () => {
-    if (!isOfflineMode) {
-      DataManager.syncOnClose();
-    }
-  });
-
-  // Listen for settings changes to update UI elements & AI re-init
+  // Listen for settings changes
   window.addEventListener('settingschanged', onSettingsChanged);
-  // Project / data changes (aggiornano label progetto corrente)
   window.addEventListener('projectchanged', updateActiveProjectIndicator);
   window.addEventListener('datachanged', e => {
     if (e.detail?.type === 'projects') updateActiveProjectIndicator();
@@ -399,7 +262,7 @@ function setupEventListeners() {
 
 function updateConsistencyIndicator(status, message, details) {
   const indicator = document.getElementById('consistency-status-indicator');
-  if (!indicator) return; // Exit if indicator doesn't exist (e.g. not in Dashboard)
+  if (!indicator) return;
 
   const msgEl = indicator.querySelector('p');
   const detailsEl = document.getElementById('consistency-status-details');
@@ -411,15 +274,13 @@ function updateConsistencyIndicator(status, message, details) {
     return;
   }
 
-  // Show
   indicator.classList.remove('translate-y-full', 'hidden');
   indicator.classList.add('translate-y-0');
 
   if (message && msgEl) msgEl.textContent = message;
   if (details && detailsEl) detailsEl.textContent = details;
 
-  // Status styling
-  if (!icon) return; // Prevent crash if icon missing
+  if (!icon) return;
 
   if (status === 'error') {
     icon.setAttribute('data-lucide', 'alert-triangle');
@@ -430,7 +291,6 @@ function updateConsistencyIndicator(status, message, details) {
     icon.classList.remove('animate-spin');
     icon.classList.add('text-green-500');
   } else {
-    // running
     icon.setAttribute('data-lucide', 'loader-2');
     icon.classList.add('animate-spin', 'text-accent');
     icon.classList.remove('text-red-500', 'text-green-500');
@@ -448,7 +308,6 @@ async function switchView(viewName) {
   document.querySelectorAll('#main-nav .nav-item').forEach(item => {
     const isActive = item.dataset.view === viewName;
     const innerDiv = item.firstElementChild;
-    // Toggle active logic for both standard CSS/Tailwind
     if (innerDiv) {
       if (isActive) {
         innerDiv.setAttribute('data-active', 'true');
@@ -457,7 +316,6 @@ async function switchView(viewName) {
         innerDiv.setAttribute('data-active', 'false');
         innerDiv.classList.remove('bg-accent/10', 'text-accent');
       }
-      // Reset generic hover if needed
     }
   });
 
@@ -475,10 +333,9 @@ async function switchView(viewName) {
       if (!response.ok) throw new Error(`Could not load view: ${viewName}`);
       const html = await response.text();
 
-      if (myToken !== currentViewToken) return; // Race abort
+      if (myToken !== currentViewToken) return;
 
-      // Apply HTML
-      container.style.opacity = '0'; // Brief fade before showing real content
+      container.style.opacity = '0';
       setTimeout(async () => {
         container.innerHTML = html;
         container.style.opacity = '1';
@@ -489,7 +346,6 @@ async function switchView(viewName) {
         if (module.default && typeof module.default.init === 'function') {
           module.default.init(
             DataManager,
-            isOfflineMode ? null : FirebaseSync,
             loadModal,
             switchView
           );
@@ -514,7 +370,6 @@ function closeMobileMenu() {
   }
 }
 
-// Gestione cambi settings (AI re-init on demand)
 async function onSettingsChanged() {
   updateActiveProjectIndicator();
   try {
@@ -522,7 +377,6 @@ async function onSettingsChanged() {
     const next = {
       provider: s.aiProvider || 'openai-compatible',
       baseUrl: s.aiBaseUrl || '',
-      // Backward-compat: prefer aiApiKey, fallback to legacy geminiApiKey
       apiKey: s.aiApiKey || s.geminiApiKey || '',
       model: s.aiModel || '',
       headers: s.aiHeaders || {},
@@ -537,7 +391,6 @@ async function onSettingsChanged() {
       AIService.init(next);
       lastAIConfig = { ...next };
 
-      // Update UI Panel Label
       if (window.aiPanel && typeof window.aiPanel.updateModelInfo === 'function') {
         window.aiPanel.updateModelInfo();
       }
@@ -553,8 +406,6 @@ async function loadModal(modalName) {
   const modalId = `${modalName}-modal`;
   let module;
 
-  // Prova a vedere se il modulo è già stato caricato in qualche modo (es. in un registro)
-  // Per ora, ci basiamo sulla presenza dell'elemento nel DOM e assumiamo che il modulo sia caricato
   if (document.getElementById(modalId)) {
     try {
       module = await import(`./views/modals/${modalName}.js`);

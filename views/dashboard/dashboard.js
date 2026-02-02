@@ -1,4 +1,4 @@
-let DataManager, FirebaseSync, loadModal, switchView;
+let DataManager, loadModal, switchView;
 // Lazy import to avoid breaking existing flow; will import when rendering
 let newProjectModal = null;
 let deleteConfirmModalEl = null;
@@ -124,9 +124,8 @@ async function loadProjects() {
 }
 
 export default {
-  init: function (dataManager, firebaseSync, modalLoader, viewSwitcher) {
+  init: function (dataManager, modalLoader, viewSwitcher) {
     DataManager = dataManager;
-    FirebaseSync = firebaseSync;
     loadModal = modalLoader;
     switchView = viewSwitcher;
 

@@ -1,5 +1,5 @@
 import { AIService } from '../../ai/AIService.js';
-let DataManager, FirebaseSync, loadModal, switchView;
+let DataManager, loadModal, switchView;
 let currentProjectId;
 let newIdeaModal = null;
 let characterModal = null;
@@ -694,9 +694,8 @@ async function handleNewCultureClick() {
 }
 
 export default {
-  init: async function (dataManager, firebaseSync, modalLoader, viewSwitcher) {
+  init: async function (dataManager, modalLoader, viewSwitcher) {
     DataManager = dataManager;
-    FirebaseSync = firebaseSync;
     loadModal = modalLoader;
     switchView = viewSwitcher;
 
@@ -815,11 +814,160 @@ export default {
 
           await window.consistencyEngine.forceReanalysis();
 
+          // After reanalysis, load all extracted suggestions
+          await loadExtractedSuggestions();
+
           if (icon) icon.classList.remove('animate-spin');
           forceBtn.disabled = false;
         }
       };
     }
+
+    // --- LOAD EXTRACTED SUGGESTIONS FROM SCENES ---
+    // This function reads extractedEntities from all scenes and converts them to displayable suggestions
+    async function loadExtractedSuggestions() {
+      console.log('[Ideation] loadExtractedSuggestions called');
+      console.log('[Ideation] consistencyEngine:', !!window.consistencyEngine);
+      console.log('[Ideation] dataManager:', !!window.consistencyEngine?.dataManager);
+      console.log('[Ideation] currentProjectId:', currentProjectId);
+
+      if (!window.consistencyEngine?.dataManager || !currentProjectId) {
+        console.warn('[Ideation] loadExtractedSuggestions aborted - missing dependencies');
+        return;
+      }
+
+      try {
+        const scenes = await window.consistencyEngine.dataManager.getProjectItems(currentProjectId, 'scenes');
+        console.log('[Ideation] Scenes found:', scenes.length);
+
+        // Debug: count scenes with extractedEntities
+        const scenesWithEntities = scenes.filter(s => s.extractedEntities && Array.isArray(s.extractedEntities) && s.extractedEntities.length > 0);
+        console.log('[Ideation] Scenes with extractedEntities:', scenesWithEntities.length);
+        if (scenesWithEntities.length > 0) {
+          console.log('[Ideation] Sample extractedEntities:', scenesWithEntities[0].extractedEntities);
+        }
+        const [characters, locations, objects, systems] = await Promise.all([
+          window.consistencyEngine.dataManager.getProjectItems(currentProjectId, 'characters'),
+          window.consistencyEngine.dataManager.getProjectItems(currentProjectId, 'locations'),
+          window.consistencyEngine.dataManager.getProjectItems(currentProjectId, 'objects'),
+          window.consistencyEngine.dataManager.getProjectItems(currentProjectId, 'systems')
+        ]);
+
+        // Build set of known names to exclude already-registered entities
+        const knownNames = new Set([
+          ...characters.map(c => c.name.toLowerCase()),
+          ...locations.map(l => l.name.toLowerCase()),
+          ...objects.map(o => o.name.toLowerCase()),
+          ...systems.map(s => s.name.toLowerCase())
+        ]);
+
+        // Collect all extracted entities from scenes
+        const suggestions = [];
+        const seenNames = new Set();
+
+        for (const scene of scenes) {
+          if (!scene.extractedEntities || !Array.isArray(scene.extractedEntities)) continue;
+
+          for (const entity of scene.extractedEntities) {
+            if (!entity.name) continue;
+            const lowerName = entity.name.toLowerCase().trim();
+
+            // Skip if already in database or already added as suggestion
+            if (knownNames.has(lowerName)) continue;
+            if (seenNames.has(lowerName)) {
+              // Increment count for existing suggestion
+              const existing = suggestions.find(s => s.data.name.toLowerCase() === lowerName);
+              if (existing) existing.data.count++;
+              continue;
+            }
+
+            seenNames.add(lowerName);
+            suggestions.push({
+              type: 'ghost_character', // Use existing type for UI compatibility
+              severity: 'info',
+              projectId: currentProjectId,
+              source: scene.extractionSource || 'ai',
+              message: `"${entity.name}" estratto da "${scene.title}"`,
+              data: {
+                name: entity.name,
+                type: entity.type || 'Entità',
+                description: entity.description || entity.d || '',
+                role: entity.role || entity.r || '',
+                count: 1
+              }
+            });
+          }
+        }
+
+        console.log(`[Ideation] Loaded ${suggestions.length} suggestions from ${scenes.length} scenes`);
+
+        // Dispatch to UI
+        const evt = new CustomEvent('consistency-issues-updated', {
+          detail: { issues: suggestions, aiStatus: 'online' }
+        });
+        window.dispatchEvent(evt);
+
+      } catch (e) {
+        console.error('[Ideation] Failed to load suggestions:', e);
+      }
+    }
+
+    // Expose for manual refresh
+    window.loadExtractedSuggestions = loadExtractedSuggestions;
+
+    // Auto-load suggestions when ideation view loads
+    setTimeout(loadExtractedSuggestions, 500);
+
+    // --- ANALYSIS PROGRESS LISTENER ---
+    window.addEventListener('analysis-progress', (e) => {
+      const { total, completed, currentScene, estimatedRemainingMs, isActive } = e.detail;
+
+      const panel = document.getElementById('analysis-progress-panel');
+      const progressText = document.getElementById('progress-text');
+      const progressBar = document.getElementById('progress-bar');
+      const timeText = document.getElementById('progress-time');
+      const currentText = document.getElementById('progress-current-scene');
+
+      if (!panel) return;
+
+      // Only show panel if analysis is actually active
+      if (isActive && total > 0) {
+        panel.classList.remove('hidden');
+        progressText.textContent = `Analisi: ${completed}/${total} scene`;
+        progressBar.style.width = `${(completed / total) * 100}%`;
+
+        if (estimatedRemainingMs > 0 && completed < total) {
+          const mins = Math.ceil(estimatedRemainingMs / 60000);
+          if (mins > 1) {
+            timeText.textContent = `~${mins} min rimanenti`;
+          } else {
+            const secs = Math.ceil(estimatedRemainingMs / 1000);
+            timeText.textContent = `~${secs}s rimanenti`;
+          }
+        } else if (completed >= total) {
+          timeText.textContent = 'Completato!';
+        }
+
+        if (currentScene) {
+          currentText.textContent = `Elaborando: ${currentScene}`;
+        }
+
+        // Refresh lucide icons for the loader
+        if (window.lucide) window.lucide.createIcons();
+      } else if (!isActive) {
+        // Hide panel if analysis is not active
+        panel.classList.add('hidden');
+      }
+
+      // Hide panel after completion
+      if (completed >= total && total > 0 && isActive) {
+        setTimeout(() => {
+          panel.classList.add('hidden');
+          // Reset bar
+          progressBar.style.width = '0%';
+        }, 3000);
+      }
+    });
 
     // MemVid Upload Handler
     const memvidInput = document.getElementById('memvid-upload');
@@ -924,7 +1072,7 @@ export default {
         const isHeuristic = issues.some(i => i.source === 'heuristic');
         const isError = aiStatus === 'error';
         const isNotConfigured = aiStatus === 'not_configured';
-        const isLoading = aiStatus === 'loading' || aiStatus === 'online';
+        const isLoading = aiStatus === 'loading' || aiStatus === 'running';
 
         summaryContainer.classList.remove('hidden');
         summaryList.innerHTML = '';
@@ -941,11 +1089,23 @@ export default {
           return;
         }
 
+        // Always show the container with appropriate message
+        summaryContainer.classList.remove('hidden');
+        summaryList.innerHTML = '';
+
         if (issues.length === 0) {
-          // Se non ci sono issue attive, nascondiamo tutto il container summary se non ci sono errori
-          if (!isError && !isNotConfigured) {
-            summaryContainer.classList.add('hidden');
+          // No issues - show helpful message
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'text-sm text-secondary bg-white/5 p-3 rounded';
+
+          if (isError) {
+            emptyDiv.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 inline mr-2 text-yellow-400"></i>Errore connessione AI. Verifica le impostazioni.`;
+          } else if (isNotConfigured) {
+            emptyDiv.innerHTML = `<i data-lucide="settings" class="w-4 h-4 inline mr-2 text-accent"></i>AI non configurata. Vai in Impostazioni per configurare Ollama.`;
+          } else {
+            emptyDiv.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4 inline mr-2 text-green-400"></i>Nessun nuovo suggerimento. Clicca "Rianalisi AI" per analizzare il manoscritto.`;
           }
+          summaryList.appendChild(emptyDiv);
         } else {
           // Status Banner se errore critico
           if (isError || isNotConfigured) {
@@ -959,8 +1119,6 @@ export default {
             summaryList.appendChild(statusDiv);
           }
 
-
-          summaryContainer.classList.remove('hidden');
           const div = document.createElement('div');
           div.className = 'flex flex-col gap-2';
           div.innerHTML = `
@@ -974,6 +1132,8 @@ export default {
                 `;
           summaryList.appendChild(div);
         }
+
+        if (window.lucide) window.lucide.createIcons();
       }
 
       // --- 2. CHARACTERS TAB: COLLAPSIBLE ACCORDION ---
