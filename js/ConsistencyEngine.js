@@ -543,37 +543,70 @@ export class ConsistencyEngine {
         // WORKER PATH (TOON Protocol)
         if (useWorker) {
             try {
-                this.log("Accodamento al Worker...", 'info');
-                // analyzeBackground ritorna direttamente oggetto TOON: { c:[], l:[], ... }
-                const toonData = await this.aiService.analyzeBackground(text, 'extraction');
+                // CHUNKING STRATEGY (Max 2000 chars per chunk to avoid timeouts on local LLMs)
+                const MAX_CHUNK_SIZE = 2000;
+                const chunks = [];
+                for (let i = 0; i < text.length; i += MAX_CHUNK_SIZE) {
+                    chunks.push(text.substring(i, i + MAX_CHUNK_SIZE));
+                }
 
-                if (!toonData) return null;
+                this.log(`Analisi AI split in ${chunks.length} chunks (Scena len: ${text.length})...`, 'info');
+
+                // Process chunks SEQUENTIALLY to avoid overloading local LLM (Ollama usually handles 1 req at a time)
+                const results = [];
+                for (let i = 0; i < chunks.length; i++) {
+                    const chunk = chunks[i];
+                    try {
+                        this.log(`Analisi Chunk ${i + 1}/${chunks.length}...`, 'info');
+                        const res = await this.aiService.analyzeBackground(chunk, 'extraction');
+                        if (res) results.push(res);
+                    } catch (chunkErr) {
+                        console.warn(`Chunk ${i + 1} failed:`, chunkErr);
+                        this.log(`Errore nel chunk ${i + 1}: ${chunkErr.message}`, 'warning');
+                        // Continue with other chunks - partial data is better than nothing? 
+                        // Or fail? Let's keep what we have.
+                    }
+                }
+
+                if (results.length === 0) return null;
+
+                // MERGE RESULTS
+                // Each result is TOON object: { c:[], l:[], ... }
+                const combinedToon = { c: [], l: [], o: [], k: [] };
+
+                results.forEach(res => {
+                    if (!res) return;
+                    if (res.c) combinedToon.c.push(...res.c);
+                    if (res.l) combinedToon.l.push(...res.l);
+                    if (res.o) combinedToon.o.push(...res.o);
+                    if (res.k) combinedToon.k.push(...res.k);
+                });
 
                 // Converter TOON -> Consistency Entity Format [{name, type}]
                 // Il motore di consistenza per ora vuole un array piatto semplice per il controllo ghost
                 const entities = [];
 
                 // Map Characters (c)
-                if (Array.isArray(toonData.c)) {
-                    toonData.c.forEach(x => {
+                if (Array.isArray(combinedToon.c)) {
+                    combinedToon.c.forEach(x => {
                         if (x.n) entities.push({ name: x.n, type: 'Personaggio', role: x.r, description: x.d });
                     });
                 }
                 // Map Locations (l)
-                if (Array.isArray(toonData.l)) {
-                    toonData.l.forEach(x => {
+                if (Array.isArray(combinedToon.l)) {
+                    combinedToon.l.forEach(x => {
                         if (x.n) entities.push({ name: x.n, type: 'Luogo', description: x.d });
                     });
                 }
                 // Map Objects (o)
-                if (Array.isArray(toonData.o)) {
-                    toonData.o.forEach(x => {
+                if (Array.isArray(combinedToon.o)) {
+                    combinedToon.o.forEach(x => {
                         if (x.n) entities.push({ name: x.n, type: 'Oggetto', description: x.d });
                     });
                 }
                 // Map Systems/Culture (k) -> Sistema
-                if (Array.isArray(toonData.k)) {
-                    toonData.k.forEach(x => {
+                if (Array.isArray(combinedToon.k)) {
+                    combinedToon.k.forEach(x => {
                         if (x.n) entities.push({ name: x.n, type: 'Sistema', description: x.d });
                     });
                 }
@@ -581,8 +614,8 @@ export class ConsistencyEngine {
                 return entities;
 
             } catch (err) {
-                console.error("Worker Error:", err);
-                this.log("Errore Worker: " + err.message, 'error');
+                console.error("Worker Chunking Error:", err);
+                this.log("Errore Worker/Chunking: " + err.message, 'error');
                 throw err; // Propagate to block heuristic fallback
             }
         }

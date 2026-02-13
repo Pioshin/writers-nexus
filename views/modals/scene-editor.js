@@ -10,8 +10,10 @@ let modal,
   saveBtn,
   cancelBtn,
   modalTitle;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('scene-editor-modal');
   form = document.getElementById('scene-editor-form');
   modalTitle = document.getElementById('scene-editor-title');
@@ -28,6 +30,8 @@ function init() {
     e.preventDefault();
     save();
   });
+
+  isInitialized = true;
 }
 
 function open({ scene = {}, stageKey = null } = {}) {

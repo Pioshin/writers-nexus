@@ -11,6 +11,16 @@ let config = {
     model: '',
 };
 
+function normalizeBaseUrl(url) {
+    return (url || '').trim().replace(/\/+$/, '');
+}
+
+function resolveBaseUrl() {
+    const fallback = config.provider === 'ollama' ? 'http://127.0.0.1:11434' : '';
+    const base = normalizeBaseUrl(config.baseUrl || fallback);
+    return config.provider === 'ollama' ? base.replace(/\/v1$/, '') : base;
+}
+
 // Queue management
 const queue = [];
 let isProcessing = false;
@@ -32,10 +42,34 @@ self.onmessage = async (e) => {
     if (type === 'CHECK_CONNECTION') {
         try {
             // Simple ping to Ollama
-            const url = config.provider === 'ollama' ? `${config.baseUrl}/api/tags` : `${config.baseUrl}/models`;
+            const baseUrl = resolveBaseUrl();
+            const url = config.provider === 'ollama' ? `${baseUrl}/api/tags` : `${baseUrl}/models`;
             const res = await fetch(url);
-            if (res.ok) self.postMessage({ type: 'CONNECTION_OK', id });
-            else throw new Error(res.statusText);
+            if (!res.ok) throw new Error(res.statusText);
+
+            if (config.provider === 'ollama') {
+                const data = await res.json();
+                const models = Array.isArray(data?.models) ? data.models : [];
+                const configuredModel = (config.model || '').trim();
+
+                if (!configuredModel) {
+                    throw new Error('Nessun modello Ollama configurato nelle impostazioni AI.');
+                }
+
+                const normalizeModel = m => String(m || '').replace(/:latest$/, '').trim().toLowerCase();
+                const wanted = normalizeModel(configuredModel);
+                const exists = models.some(m => {
+                    const name = normalizeModel(m?.name);
+                    const model = normalizeModel(m?.model);
+                    return name === wanted || model === wanted;
+                });
+
+                if (!exists) {
+                    throw new Error(`Modello Ollama non trovato: ${configuredModel}`);
+                }
+            }
+
+            self.postMessage({ type: 'CONNECTION_OK', id });
         } catch (e) {
             self.postMessage({ type: 'CONNECTION_ERROR', id, error: e.message });
         }
@@ -100,11 +134,11 @@ async function runAnalysisStep(payload, jobId) {
 // Streaming-enabled fetch wrapper
 async function callLLM(prompt, system, jobId) {
     try {
-        let url = `${config.baseUrl}/chat/completions`;
+        let url = `${resolveBaseUrl()}/chat/completions`;
         let isOllama = config.provider === 'ollama';
 
         if (isOllama) {
-            url = `${config.baseUrl}/v1/chat/completions`;
+            url = `${resolveBaseUrl()}/v1/chat/completions`;
         }
 
         const body = {

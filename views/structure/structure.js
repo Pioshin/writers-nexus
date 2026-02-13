@@ -280,6 +280,8 @@ function createSceneCard(scene, isUnassigned = false) {
   const template = document.getElementById('scene-card-template');
   const cardEl = template.content.cloneNode(true).firstElementChild;
   cardEl.dataset.sceneId = scene.id;
+  cardEl.dataset.order =
+    typeof scene.order === 'number' ? String(scene.order) : '';
   cardEl.draggable = true;
   cardEl.querySelector('.scene-title').textContent = scene.title;
   // Mini badge stage (spostato top-left con tooltip)
@@ -565,6 +567,7 @@ function enableCardReorder(cardEl, scene, stageKey, listEl) {
   });
   cardEl.addEventListener('drop', async e => {
     const dragging = document.querySelector('.scene-card.dragging');
+    const before = cardEl.classList.contains('drop-indicator-before');
     cardEl.classList.remove('drop-indicator-before', 'drop-indicator-after');
     if (!dragging) return;
     const draggedId = dragging.dataset.sceneId;
@@ -573,10 +576,10 @@ function enableCardReorder(cardEl, scene, stageKey, listEl) {
     if (!listEl.contains(dragging)) return; // spostamento cross-stage già gestito altrove
     e.preventDefault();
     const dragScene = await DataManager.getScene(draggedId);
-    const snapshot = snapshotStage(stageKey, listEl);
-    const before = cardEl.classList.contains('drop-indicator-before');
+    const beforeSnapshot = snapshotStage(stageKey, listEl);
+    if (!dragScene) return;
     // Ricalcola ordine: prendi ordine target e crea offset
-    const targetOrder = scene.order;
+    const targetOrder = Number(scene.order || 0);
     const siblings = Array.from(listEl.querySelectorAll('.scene-card'))
       .map(el => ({ id: el.dataset.sceneId, order: Number(el.dataset.order) }))
       .filter(o => !isNaN(o.order));
@@ -598,19 +601,20 @@ function enableCardReorder(cardEl, scene, stageKey, listEl) {
     // Se collassa (nessun gap) riesegui compattazione
     if (siblings.some(s => s.order === newOrder)) {
       await normalizeStageOrders(stageKey, listEl, siblings);
-      const target = siblings.find(s => s.id === scene.id);
+      const normalized = await DataManager.getScenesForStage(currentProjectId, stageKey);
+      const target = normalized.find(s => s.id === scene.id);
       const compactTargetOrder = target ? target.order : targetOrder;
-      const compactSiblings = siblings.map(s =>
-        s.id === scene.id ? { ...s, order: compactTargetOrder } : s
-      );
       if (before) newOrder = compactTargetOrder - 50;
       else newOrder = compactTargetOrder + 50;
     }
     dragScene.order = newOrder;
     await DataManager.saveScene(dragScene);
+    const afterSnapshot = (await DataManager.getScenesForStage(
+      currentProjectId,
+      stageKey
+    )).map(s => ({ id: s.id, order: s.order, stageKey }));
+    StageUndo.recordReorder(stageKey, beforeSnapshot, afterSnapshot);
     await reloadStageList(stageKey, listEl);
-    StageUndo.record(dragScene.id, stageKey, stageKey); // per coerenza (from = to stage) non utile a revert ordine; gestiremo undo batch dopo
-    // TODO: registro undo batch (todo 30) - snapshot intanto salvato
     cardEl.classList.remove('drop-indicator-before', 'drop-indicator-after');
   });
 }

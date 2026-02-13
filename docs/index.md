@@ -28,6 +28,12 @@ Funziona nel browser e anche offline; la sincronizzazione nel cloud è facoltati
 - Partecipa alle [Discussions](https://github.com/Pioshin/writers-nexus/discussions)
 - Segnala bug: [Issues](https://github.com/Pioshin/writers-nexus/issues)
 
+## Architettura Suite Locale
+
+- [NEXUS OMINA ONE SERVER — Architettura](./NEXUS_OMINA_ONE_SERVER_ARCHITECTURE.md)
+- [NEXUS OMINA ONE SERVER — API Spec](./NEXUS_OMINA_ONE_SERVER_API_SPEC.md)
+- [NEXUS OMINA ONE SERVER — Piano Implementazione](./NEXUS_OMINA_ONE_SERVER_IMPLEMENTATION_PLAN.md)
+
 ## Supporto
 
 Usa il pulsante "Sponsor" sulla homepage del repository per sostenere il progetto.

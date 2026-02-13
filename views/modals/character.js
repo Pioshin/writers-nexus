@@ -32,8 +32,10 @@ let characterIdInput, nameInput, roleInput, appearanceInput, psychologyInput, pa
 let archetypeSelect, narrativeRoleSelect, importanceSelect;
 let relationsEditor, addRelationBtn;
 let allCharacters = [];
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('character-modal');
   form = document.getElementById('character-form');
   modalTitle = document.getElementById('character-modal-title');
@@ -64,6 +66,8 @@ function init() {
     e.preventDefault();
     save();
   });
+
+  isInitialized = true;
 }
 
 function populateSelects() {

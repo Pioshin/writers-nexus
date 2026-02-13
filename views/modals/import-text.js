@@ -1,4 +1,5 @@
 import { AIService } from '../../ai/AIService.js';
+import { toast } from '../shared/toast.js';
 
 let modalEl,
   fileInput,
@@ -62,9 +63,17 @@ let lastParsed = null; // { scenes, ideas }
 let lastAIEnrichment = null; // { entities, relations, plotlines, style }
 
 const DEBUG_IMPORT = false; // attiva log lunghezze scene
+const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_IMPORT_EXTENSIONS = new Set(['txt', 'md', 'markdown']);
+let isInitialized = false;
 
 function show() {
   modalEl.classList.remove('hidden');
+  if (statusEl) {
+    statusEl.textContent = '';
+    statusEl.classList.remove('text-red-400', 'text-green-400', 'text-yellow-300');
+    statusEl.classList.add('text-secondary');
+  }
   try {
     window.lucide?.createIcons?.();
   } catch { }
@@ -85,15 +94,26 @@ function log(msg) {
 
 async function readFileAsText(file) {
   if (!file) return '';
-  if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
-    return await file.text();
+  const fileName = file.name || '';
+  const extension = fileName.includes('.')
+    ? fileName.split('.').pop().toLowerCase()
+    : '';
+
+  if (!ALLOWED_IMPORT_EXTENSIONS.has(extension)) {
+    throw new Error(
+      `Formato non supportato. Usa solo: ${Array.from(ALLOWED_IMPORT_EXTENSIONS)
+        .map(ext => `.${ext}`)
+        .join(', ')}`
+    );
   }
-  // Docx/rtf basic fallback: attempt as text
-  try {
-    return await file.text();
-  } catch {
-    return '';
+
+  if (file.size > MAX_IMPORT_FILE_SIZE) {
+    throw new Error(
+      `File troppo grande. Dimensione massima: ${Math.round(MAX_IMPORT_FILE_SIZE / (1024 * 1024))}MB.`
+    );
   }
+
+  return await file.text();
 }
 
 function naiveSplitIntoScenes(raw, strategy, minLen) {
@@ -654,6 +674,7 @@ async function commitToProject(
 }
 
 function init(dataManager) {
+  if (isInitialized) return;
   modalEl = document.getElementById('import-text-modal');
   fileInput = document.getElementById('import-file');
   textArea = document.getElementById('import-text');
@@ -707,10 +728,37 @@ function init(dataManager) {
 
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
-    const txt = await readFileAsText(file);
-    textArea.value = txt;
-    log(`Caricato file: ${file?.name || 'n/d'} (${txt.length} caratteri)`);
+    if (!file) {
+      if (statusEl) {
+        statusEl.textContent = 'Nessun file selezionato.';
+        statusEl.classList.remove('text-secondary', 'text-red-400', 'text-green-400');
+        statusEl.classList.add('text-yellow-300');
+      }
+      return;
+    }
+    try {
+      const txt = await readFileAsText(file);
+      textArea.value = txt;
+      if (statusEl) {
+        statusEl.textContent = `File caricato: ${file.name}`;
+        statusEl.classList.remove('text-secondary', 'text-red-400', 'text-yellow-300');
+        statusEl.classList.add('text-green-400');
+      }
+      log(`Caricato file: ${file?.name || 'n/d'} (${txt.length} caratteri)`);
+    } catch (error) {
+      textArea.value = '';
+      if (statusEl) {
+        statusEl.textContent = error.message || 'Errore durante il caricamento file.';
+        statusEl.classList.remove('text-secondary', 'text-green-400', 'text-yellow-300');
+        statusEl.classList.add('text-red-400');
+      }
+      log(`Errore import file: ${error.message || error}`);
+      toast?.error?.(error.message || 'Errore durante il caricamento file.');
+      fileInput.value = '';
+    }
   });
+
+  isInitialized = true;
 
   // IMPORT (solo parsing + anteprima base)
   runBtn.addEventListener('click', async () => {

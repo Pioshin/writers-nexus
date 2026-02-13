@@ -11,6 +11,7 @@ let modalEl,
   contextEl;
 let currentMode = 'ideation';
 let fillContextBtn;
+let isInitialized = false;
 
 function show(opts = {}) {
   modalEl.classList.remove('hidden');
@@ -108,6 +109,7 @@ function buildUserPrompt({ prompt, goal, context, mode }) {
 }
 
 function init(dataManager, loadModal, switchView) {
+  if (isInitialized) return;
   modalEl = document.getElementById('ai-assistant-modal');
   sendBtn = document.getElementById('ai-send-btn');
   closeBtn = document.getElementById('ai-close-btn');
@@ -172,6 +174,8 @@ function init(dataManager, loadModal, switchView) {
       .join('\n');
     contextEl.value = ctx;
   });
+
+  isInitialized = true;
 
   return {
     init: () => {},

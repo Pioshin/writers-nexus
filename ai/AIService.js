@@ -10,10 +10,60 @@ let config = {
   provider: 'openai-compatible', // Default per compatibilità locale
   baseUrl: 'http://127.0.0.1:11434',
   apiKey: '',
-  model: 'gemma:2b',
+  model: '',
   headers: {},
 };
 let genAI = null;
+
+function normalizeBaseUrl(url) {
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+function withProviderDefaults(nextConfig) {
+  const provider = nextConfig.provider || 'openai-compatible';
+  const defaults = {
+    ollama: {
+      baseUrl: 'http://127.0.0.1:11434',
+      model: '',
+    },
+    google: {
+      baseUrl: '',
+      model: 'gemini-1.5-flash',
+    },
+    'openai-compatible': {
+      baseUrl: '',
+      model: '',
+    },
+    anthropic: {
+      baseUrl: '',
+      model: '',
+    },
+  };
+  const providerDefaults = defaults[provider] || { baseUrl: '', model: '' };
+
+  return {
+    ...nextConfig,
+    provider,
+    baseUrl: normalizeBaseUrl(nextConfig.baseUrl) || providerDefaults.baseUrl,
+    model: (nextConfig.model || '').trim() || providerDefaults.model,
+  };
+}
+
+function buildChatCompletionsUrl(currentConfig) {
+  const provider = currentConfig.provider;
+  const baseUrl = normalizeBaseUrl(currentConfig.baseUrl);
+  if (provider === 'ollama') {
+    const baseNoV1 = baseUrl.replace(/\/v1$/, '');
+    return `${baseNoV1}/v1/chat/completions`;
+  }
+  return `${baseUrl}/chat/completions`;
+}
+
+function assertModelConfigured() {
+  if (!config.model || !String(config.model).trim()) {
+    throw new Error('Modello AI non configurato. Apri Impostazioni AI e seleziona un modello valido.');
+  }
+}
 
 function initWorker() {
   if (worker) return;
@@ -92,7 +142,7 @@ function getHeaders() {
 
 export const AIService = {
   init(opts = {}) {
-    config = { ...config, ...opts };
+    config = withProviderDefaults({ ...config, ...opts });
     if (config.provider === 'google') {
       config.model = normalizeGoogleModel(config.model);
       genAI = new GoogleGenerativeAI(config.apiKey);
@@ -118,6 +168,7 @@ export const AIService = {
 
   // Standard interactive completion (still main thread for responsiveness in chat)
   async complete({ prompt, system, temperature = 0.7, maxTokens = 800 }) {
+    assertModelConfigured();
     if (config.provider === 'google') {
       if (!genAI) throw new Error('Google AI not initialized.');
       const model = genAI.getGenerativeModel({
@@ -136,6 +187,7 @@ export const AIService = {
 
   // Background optimized analysis (Worker)
   async analyzeBackground(chunk, type = 'extraction', context = 'general') {
+    assertModelConfigured();
     if (!worker) initWorker();
 
     // Check connection first if using local LLM to avoid silent failures
@@ -176,6 +228,7 @@ export const AIService = {
   },
 
   async chat({ messages, temperature = 0.7, maxTokens = 800 }) {
+    assertModelConfigured();
     if (config.provider === 'google') {
       if (!genAI) throw new Error('Google AI not initialized');
       const model = genAI.getGenerativeModel({ model: config.model });
@@ -190,8 +243,7 @@ export const AIService = {
     }
 
     // Std fetch
-    let url = `${config.baseUrl}/chat/completions`;
-    if (config.provider === 'ollama') url = `${config.baseUrl}/v1/chat/completions`;
+    const url = buildChatCompletionsUrl(config);
 
     const payload = {
       model: config.model,
@@ -211,8 +263,8 @@ export const AIService = {
 
   // Internal helper
   async _fetchCompletion(prompt, system, temperature, maxTokens) {
-    let url = `${config.baseUrl}/chat/completions`;
-    if (config.provider === 'ollama') url = `${config.baseUrl}/v1/chat/completions`;
+    assertModelConfigured();
+    const url = buildChatCompletionsUrl(config);
 
     const payload = {
       model: config.model,

@@ -2,6 +2,7 @@ let modal, titleEl, messageEl, primaryBtn, secondaryBtn, closeBtn;
 let resolver = null;
 let lastFocused = null;
 let trapCleanup = null;
+let isInitialized = false;
 
 function trapFocus(container) {
   const FOCUSABLE =
@@ -37,6 +38,7 @@ function trapFocus(container) {
 }
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('confirm-modal');
   titleEl = document.getElementById('confirm-modal-title');
   messageEl = document.getElementById('confirm-modal-message');
@@ -53,6 +55,7 @@ function init() {
   primaryBtn.addEventListener('click', () => resolveAndHide(true));
   secondaryBtn.addEventListener('click', () => resolveAndHide(false));
   closeBtn.addEventListener('click', () => resolveAndHide(false));
+  isInitialized = true;
 }
 
 function open({

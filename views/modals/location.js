@@ -3,8 +3,10 @@ import { toast } from '../shared/toast.js';
 
 let modal, form, cancelBtn, saveBtn;
 let idInput, nameInput, descriptionInput, historyInput, roleInput;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('location-modal');
   form = document.getElementById('location-form');
   cancelBtn = document.getElementById('cancel-location-modal');
@@ -22,6 +24,8 @@ function init() {
     e.preventDefault();
     save();
   });
+
+  isInitialized = true;
 }
 
 function open(location = {}) {

@@ -3,8 +3,10 @@ import { toast } from '../shared/toast.js';
 
 let modal, form, cancelBtn, saveBtn;
 let idInput, nameInput, descriptionInput, importanceInput;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('object-modal');
   form = document.getElementById('object-form');
   cancelBtn = document.getElementById('cancel-object-modal');
@@ -21,6 +23,8 @@ function init() {
     e.preventDefault();
     save();
   });
+
+  isInitialized = true;
 }
 
 function open(obj = {}) {

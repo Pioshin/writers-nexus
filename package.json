@@ -11,7 +11,7 @@
     "stylelint-config-standard": "^39.0.0"
   },
   "scripts": {
-    "start": "live-server --port=55099",
+    "start": "live-server --host=127.0.0.1 --port=55099",
     "lint": "npx eslint . --ext .js,.html --ignore-pattern \"PROTOTIPI ED ESEMPI non fanno parte del progetto/\" --ignore-pattern \"node_modules/\"",
     "lint:html": "npx htmlhint \"**/*.html\" --ignore \"PROTOTIPI ED ESEMPI non fanno parte del progetto/**\" --ignore \"node_modules/**\"",
     "lint:css": "npx stylelint \"style.css\"",

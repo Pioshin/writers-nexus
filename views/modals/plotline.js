@@ -16,6 +16,7 @@ let modal,
 let saveBtn, cancelBtn, newBtn, addBeatBtn, deleteBtn;
 let lastFocused = null;
 let trapCleanup = null;
+let isInitialized = false;
 
 function trapFocus(container) {
   const FOCUSABLE =
@@ -239,6 +240,7 @@ function bindBeatDeletes() {
 }
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('plotline-modal');
   listEl = document.getElementById('pl-list');
   form = document.getElementById('pl-form');
@@ -269,6 +271,7 @@ function init() {
   bindBeatDeletes();
 
   loadList();
+  isInitialized = true;
 }
 
 function open() {

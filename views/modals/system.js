@@ -3,8 +3,10 @@ import { toast } from '../shared/toast.js';
 
 let modal, form, cancelBtn, saveBtn;
 let idInput, nameInput, rulesInput, roleInput;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('system-modal');
   form = document.getElementById('system-form');
   cancelBtn = document.getElementById('cancel-system-modal');
@@ -21,6 +23,8 @@ function init() {
     e.preventDefault();
     save();
   });
+
+  isInitialized = true;
 }
 
 function open(system = {}) {

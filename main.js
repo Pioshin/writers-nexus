@@ -32,6 +32,44 @@ let confirmModal;
 let currentViewToken = 0;
 let lastAIConfig = null;
 
+function buildAIConfig(settings = {}) {
+  const provider = settings.aiProvider || 'openai-compatible';
+  const baseUrlRaw = (settings.aiBaseUrl || '').trim();
+  const modelRaw = (settings.aiModel || '').trim();
+
+  const defaultsByProvider = {
+    ollama: {
+      baseUrl: 'http://127.0.0.1:11434',
+      model: '',
+    },
+    google: {
+      baseUrl: '',
+      model: 'gemini-1.5-flash',
+    },
+    'openai-compatible': {
+      baseUrl: '',
+      model: '',
+    },
+    anthropic: {
+      baseUrl: '',
+      model: '',
+    },
+  };
+
+  const providerDefaults = defaultsByProvider[provider] || {
+    baseUrl: '',
+    model: '',
+  };
+
+  return {
+    provider,
+    baseUrl: baseUrlRaw || providerDefaults.baseUrl,
+    apiKey: settings.aiApiKey || settings.geminiApiKey || '',
+    model: modelRaw || providerDefaults.model,
+    headers: settings.aiHeaders || {},
+  };
+}
+
 // --- UI NOTIFIER ---
 const uiNotifier = {
   showStatus(
@@ -95,6 +133,19 @@ async function initializeApp() {
   setupEventListeners();
   DataManager.init(uiNotifier);
 
+  const expectedOrigin = 'http://127.0.0.1:55099';
+  if (window.location.origin !== expectedOrigin) {
+    console.warn(
+      `[Storage] Origin attuale ${window.location.origin} diverso da ${expectedOrigin}. IndexedDB è separato per origin (host+porta).`
+    );
+    setTimeout(() => {
+      uiNotifier.showStatus(
+        `Stai usando ${window.location.origin}. I dati locali sono separati per host/porta. Per ritrovare i progetti, usa ${expectedOrigin}.`,
+        { isError: true, autoClose: 7000 }
+      );
+    }, 500);
+  }
+
   // Esponi un helper globale per conferme custom
   window.appConfirm = async (message, opts = {}) => {
     try {
@@ -110,13 +161,7 @@ async function initializeApp() {
   await updateActiveProjectIndicator();
 
   // Init AI with settings
-  const initialAI = {
-    provider: settings.aiProvider || 'openai-compatible',
-    baseUrl: settings.aiBaseUrl || '',
-    apiKey: settings.aiApiKey || settings.geminiApiKey || '',
-    model: settings.aiModel || '',
-    headers: settings.aiHeaders || {},
-  };
+  const initialAI = buildAIConfig(settings);
   AIService.init(initialAI);
   lastAIConfig = { ...initialAI };
 
@@ -374,13 +419,7 @@ async function onSettingsChanged() {
   updateActiveProjectIndicator();
   try {
     const s = await DataManager.getSettings();
-    const next = {
-      provider: s.aiProvider || 'openai-compatible',
-      baseUrl: s.aiBaseUrl || '',
-      apiKey: s.aiApiKey || s.geminiApiKey || '',
-      model: s.aiModel || '',
-      headers: s.aiHeaders || {},
-    };
+    const next = buildAIConfig(s);
     if (
       !lastAIConfig ||
       lastAIConfig.provider !== next.provider ||

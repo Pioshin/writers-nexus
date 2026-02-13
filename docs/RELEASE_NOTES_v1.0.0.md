@@ -1,6 +1,6 @@
-# Writers Nexus v1.0.0 — Public‑ready
+# Writers Nexus v0.1.0-alpha — Stato attuale (work in progress)
 
-> Offline‑first. Import & Struttura solida. Suggerimenti IA per il Viaggio dell'Eroe. Editor a blocchi. UI scura leggibile.
+> Documento interno di avanzamento: descrive funzionalità presenti in alpha, non un rilascio pubblico stabile.
 
 ## Highlights
 

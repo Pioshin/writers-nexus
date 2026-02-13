@@ -16,6 +16,7 @@ let countBarEl;
 let suggestionsState = []; // {id, suggestedStage, confidence, applied:boolean}
 let selection = new Set();
 let rawSuggestionsCount = 0; // numero totale suggerimenti grezzi (prima della dedup)
+let isInitialized = false;
 
 const HERO_STAGE_LABEL = {
   ordinary_world: 'Mondo Ordinario',
@@ -61,6 +62,7 @@ function stageBadgeClass(key) {
 }
 
 async function init(dataManager, modalLoader, viewSwitcher) {
+  if (isInitialized) return;
   DataManager = dataManager;
   loadModal = modalLoader;
   switchView = viewSwitcher;
@@ -96,6 +98,7 @@ async function init(dataManager, modalLoader, viewSwitcher) {
   });
   minConfInput?.addEventListener('input', renderBody);
   autoThresholdInput?.addEventListener('input', () => updateButtons());
+  isInitialized = true;
 }
 
 function open() {

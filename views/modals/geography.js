@@ -3,8 +3,10 @@ import { toast } from '../shared/toast.js';
 
 let modal, form, cancelBtn, saveBtn;
 let idInput, nameInput, descriptionInput;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('geography-modal');
   form = document.getElementById('geography-form');
   cancelBtn = document.getElementById('cancel-geography-modal');
@@ -20,6 +22,8 @@ function init() {
     e.preventDefault();
     save();
   });
+
+  isInitialized = true;
 }
 
 function open(item = {}) {

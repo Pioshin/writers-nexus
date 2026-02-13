@@ -2,6 +2,7 @@ let DataManager;
 let modal, form, cancelBtn, titleInput, premiseInput, genreInput, toneInput;
 let resolvePromise, rejectPromise;
 let currentEditingProjectId = null;
+let isInitialized = false;
 
 async function handleFormSubmit(e) {
   e.preventDefault();
@@ -37,10 +38,10 @@ async function handleFormSubmit(e) {
 }
 
 function handleCancel() {
-  close();
   if (rejectPromise) {
     rejectPromise(new Error('Modal cancelled'));
   }
+  close();
 }
 
 function open(project = null) {
@@ -66,9 +67,6 @@ function open(project = null) {
 
   modal.classList.remove('hidden');
 
-  form.addEventListener('submit', handleFormSubmit);
-  cancelBtn.addEventListener('click', handleCancel);
-
   return new Promise((resolve, reject) => {
     resolvePromise = resolve;
     rejectPromise = reject;
@@ -77,14 +75,13 @@ function open(project = null) {
 
 function close() {
   modal.classList.add('hidden');
-  form.removeEventListener('submit', handleFormSubmit);
-  cancelBtn.removeEventListener('click', handleCancel);
   resolvePromise = null;
   rejectPromise = null;
   currentEditingProjectId = null;
 }
 
 function init(dataManager) {
+  if (isInitialized) return;
   DataManager = dataManager;
 
   modal = document.getElementById('new-project-modal');
@@ -94,6 +91,10 @@ function init(dataManager) {
   premiseInput = document.getElementById('new-project-premise');
   genreInput = document.getElementById('new-project-genre');
   toneInput = document.getElementById('new-project-tone');
+
+  form.addEventListener('submit', handleFormSubmit);
+  cancelBtn.addEventListener('click', handleCancel);
+  isInitialized = true;
 }
 
 export default { init, open, close };

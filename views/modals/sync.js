@@ -8,8 +8,10 @@ let modal,
   actionsContainer;
 let primaryAction = null;
 let secondaryAction = null;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('sync-modal');
   titleEl = document.getElementById('sync-modal-title');
   messageEl = document.getElementById('sync-modal-message');
@@ -28,6 +30,7 @@ function init() {
     if (primaryAction) primaryAction();
     // Non nascondere automaticamente, l'azione primaria potrebbe avere un suo feedback
   });
+  isInitialized = true;
 }
 
 function show({

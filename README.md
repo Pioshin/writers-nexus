@@ -1,5 +1,7 @@
 # Writers Nexus
 
+> Stato progetto: **v0.1.0-alpha** (non public-ready)
+
 Una suite per la creazione di opere letterarie, dall’idea alla pubblicazione. Ti accompagna in ogni fase — ideazione, organizzazione, scrittura e revisione — con strumenti semplici ma potenti e con il supporto dell’IA, che ti guida passo dopo passo anche se è il tuo primo progetto editoriale.
 
 Funziona direttamente nel browser e anche offline, così puoi lavorare ovunque e in qualsiasi momento; quando desideri, puoi sincronizzare i tuoi lavori nel cloud. L’interfaccia è attualmente in italiano; il rilascio in altre lingue è previsto, a partire dall’inglese.
@@ -19,7 +21,7 @@ Funziona direttamente nel browser e anche offline, così puoi lavorare ovunque e
 - Temi e palette per genere, con interfaccia curata e leggibile
 - Dati sempre tuoi: offline‑first con sincronizzazione remota facoltativa
 
-## Caratteristiche (v1.0)
+## Caratteristiche (v0.1.0-alpha)
 
 - Importazione testo e segmentazione in scene (senza IA di default)
 - Struttura (Viaggio dell’Eroe)
@@ -94,7 +96,7 @@ Funziona direttamente nel browser e anche offline, così puoi lavorare ovunque e
 - Per abilitarla, inserisci in Impostazioni le credenziali Firebase (config oggetto) ed effettua login.
 - Senza configurazione, l’app resta in Modalità Offline e i dati restano sul tuo dispositivo.
 
-## Limitazioni (v1.0)
+## Limitazioni (v0.1.0-alpha)
 
 - Nessun collegamento obbligatorio al database remoto (sync Firebase opzionale)
 - Editing avanzato e Analisi in via di sviluppo

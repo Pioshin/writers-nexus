@@ -3,8 +3,10 @@ import { toast } from '../shared/toast.js';
 
 let modal, form, cancelBtn, contentInput;
 let currentEditingIdeaId = null;
+let isInitialized = false;
 
 function init() {
+  if (isInitialized) return;
   modal = document.getElementById('new-idea-modal');
   form = document.getElementById('new-idea-form');
   cancelBtn = document.getElementById('cancel-idea-modal');
@@ -12,6 +14,7 @@ function init() {
 
   cancelBtn.addEventListener('click', close);
   form.addEventListener('submit', save);
+  isInitialized = true;
 }
 
 function open(idea = null) {
