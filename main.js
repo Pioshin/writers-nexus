@@ -218,7 +218,13 @@ function setupEventListeners() {
   });
   sidebarSettingsBtn?.addEventListener('click', () => configModal?.open());
   openAiBtn?.addEventListener('click', () => aiAssistantModal?.open?.());
-  openImportBtn?.addEventListener('click', () => importTextModal?.open?.());
+  openImportBtn?.addEventListener('click', () => {
+    if (window.aiPanel?.activateImportController) {
+      window.aiPanel.activateImportController();
+    } else {
+      importTextModal?.open?.();
+    }
+  });
 
   // --- EXPORT / IMPORT HANDLERS ---
   const exportBtn = document.getElementById('export-project-btn');

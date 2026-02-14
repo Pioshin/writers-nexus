@@ -34,6 +34,14 @@ Funziona nel browser e anche offline; la sincronizzazione nel cloud è facoltati
 - [NEXUS OMINA ONE SERVER — API Spec](./NEXUS_OMINA_ONE_SERVER_API_SPEC.md)
 - [NEXUS OMINA ONE SERVER — Piano Implementazione](./NEXUS_OMINA_ONE_SERVER_IMPLEMENTATION_PLAN.md)
 
+## Workspace Operativo (allineato)
+
+- Root: `/home/pioshin/AI/Projects`
+- Frontend NW: `/home/pioshin/AI/Projects/P_NOOS/Writers_Nexus/WN_Frontend`
+- NOOS docs/contracts: `/home/pioshin/AI/Projects/P_NOOS/Writers_Nexus/NOOS`
+- ADAM-suite (BKA/KRONK): `/home/pioshin/AI/Projects/P_NOOS/ADAM-suite`
+- IODA (Digital Assistant, futuro): `/home/pioshin/AI/Projects/P_DIGITAL_ASSISTANT/IODA`
+
 ## Supporto
 
 Usa il pulsante "Sponsor" sulla homepage del repository per sostenere il progetto.

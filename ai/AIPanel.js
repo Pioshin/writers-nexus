@@ -15,10 +15,16 @@ export class AIPanel {
     this.clearBtn = document.getElementById('ai-clear-chat');
     this.contextIndicator = document.getElementById('ai-context-indicator');
     this.modelLabel = document.getElementById('ai-model-label');
+    this.importMonitorBound = false;
+    this.importControllerState = {
+      enabled: false,
+      status: 'Pronto',
+    };
 
     this.init();
     this.setupEventListeners();
     this.setupModalObserver();
+    this.setupImportMonitorBridge();
   }
 
   async init() {
@@ -52,6 +58,46 @@ export class AIPanel {
       this.style.height = this.scrollHeight + 'px';
       if (this.value === '') this.style.height = 'auto';
     });
+
+    window.addEventListener('nexus-import-controller:open', () => {
+      this.activateImportController();
+    });
+  }
+
+  setupImportMonitorBridge() {
+    if (this.importMonitorBound) return;
+    window.addEventListener('nexus-import-monitor', e => {
+      const detail = e?.detail || {};
+      const message = detail.message || 'Aggiornamento import.';
+      this.importControllerState.status = message;
+
+      const statusEl = document.getElementById('ai-import-status');
+      if (statusEl) {
+        statusEl.textContent = message;
+        statusEl.className =
+          detail.level === 'error'
+            ? 'text-[10px] text-red-400'
+            : detail.level === 'success'
+              ? 'text-[10px] text-green-400'
+              : 'text-[10px] text-secondary';
+      }
+
+      const importantStages = new Set([
+        'file-loaded',
+        'parse-start',
+        'parse-complete',
+        'ai-start',
+        'ai-complete',
+        'commit-start',
+        'commit-complete',
+        'error',
+      ]);
+      if (importantStages.has(detail.stage)) {
+        const prefix = detail.stage === 'error' ? '❌' : '🧠';
+        this.appendMessage('system', `${prefix} Import: ${message}`);
+      }
+    });
+    this.importMonitorBound = true;
   }
 
   setupModalObserver() {
@@ -116,6 +162,17 @@ export class AIPanel {
     this.panelEl.classList.remove('translate-x-full');
     this.chatInput.focus();
     this.updateQuickActionsForModal();
+  }
+
+  activateImportController() {
+    this.open();
+    this.currentContext = 'import-controller';
+    this.contextIndicator.textContent = 'Contesto: Importazione AI';
+    this.updateQuickActions('import-controller');
+    this.appendMessage(
+      'assistant',
+      'Controller Import attivo nel pannello destro. Incolla o carica il testo, poi avvia Parsing → Analisi AI → Commit.'
+    );
   }
 
   async updateModelInfo() {
@@ -272,6 +329,11 @@ export class AIPanel {
     const actionsGrid = document.getElementById('ai-actions-grid');
     if (!actionsGrid) return;
 
+    if (viewName === 'import-controller') {
+      this.renderImportController(actionsGrid);
+      return;
+    }
+
     // Define context-specific chat actions
     const actionsByContext = {
       dashboard: [
@@ -330,6 +392,101 @@ export class AIPanel {
         this.chatInput.focus();
       });
     });
+  }
+
+  renderImportController(actionsGrid) {
+    actionsGrid.innerHTML = `
+      <div class="col-span-2 p-2 rounded-lg bg-primary/50 border border-white/10 space-y-2">
+        <p class="text-[10px] uppercase tracking-wider text-secondary">Import Controller</p>
+        <input id="ai-import-file" type="file" accept=".txt,.md,.markdown" class="w-full text-xs" />
+        <textarea id="ai-import-raw" rows="4" class="w-full bg-primary/50 border border-white/10 rounded-lg px-2 py-2 text-xs resize-y" placeholder="Incolla il testo del manoscritto..."></textarea>
+        <div class="grid grid-cols-2 gap-2 text-[10px]">
+          <label class="flex items-center gap-1"><input id="ai-import-split" type="checkbox" checked />Segmenta scene</label>
+          <label class="flex items-center gap-1"><input id="ai-import-extract" type="checkbox" checked />Estrai entità (AI)</label>
+          <label class="flex items-center gap-1"><input id="ai-import-style" type="checkbox" checked />Analizza stile</label>
+          <select id="ai-import-strategy" class="bg-primary/50 border border-white/10 rounded px-2 py-1 text-[10px]">
+            <option value="auto">Auto</option>
+            <option value="paragraphs">Paragrafi</option>
+            <option value="chapters">Capitoli</option>
+          </select>
+          <input id="ai-import-min-len" type="number" value="300" class="bg-primary/50 border border-white/10 rounded px-2 py-1 text-[10px]" placeholder="Min len" />
+          <input id="ai-import-focus" type="text" class="bg-primary/50 border border-white/10 rounded px-2 py-1 text-[10px]" placeholder="Focus analisi" />
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <button id="ai-import-parse" class="px-2 py-1.5 bg-accent text-primary rounded text-xs font-semibold">Parsing</button>
+          <button id="ai-import-analyze" class="px-2 py-1.5 bg-primary/50 border border-white/10 rounded text-xs">Analisi AI</button>
+          <button id="ai-import-commit" class="px-2 py-1.5 bg-green-500/20 text-green-300 border border-green-500/30 rounded text-xs">Commit</button>
+        </div>
+        <div id="ai-import-status" class="text-[10px] text-secondary">${this.importControllerState.status}</div>
+      </div>
+    `;
+
+    const fileEl = document.getElementById('ai-import-file');
+    const rawEl = document.getElementById('ai-import-raw');
+    const splitEl = document.getElementById('ai-import-split');
+    const extractEl = document.getElementById('ai-import-extract');
+    const styleEl = document.getElementById('ai-import-style');
+    const strategyEl = document.getElementById('ai-import-strategy');
+    const minLenEl = document.getElementById('ai-import-min-len');
+    const focusEl = document.getElementById('ai-import-focus');
+
+    const pushSharedPayload = () => {
+      window.dispatchEvent(
+        new CustomEvent('nexus-import-controller:set-options', {
+          detail: {
+            splitScenes: !!splitEl?.checked,
+            extractEntities: !!extractEl?.checked,
+            analyzeStyle: !!styleEl?.checked,
+            strategy: strategyEl?.value || 'auto',
+            minSceneLength: Number.parseInt(minLenEl?.value || '300', 10) || 300,
+            focus: focusEl?.value || '',
+          },
+        })
+      );
+
+      window.dispatchEvent(
+        new CustomEvent('nexus-import-controller:set-text', {
+          detail: {
+            text: rawEl?.value || '',
+          },
+        })
+      );
+    };
+
+    fileEl?.addEventListener('change', async () => {
+      const file = fileEl.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      rawEl.value = text;
+      pushSharedPayload();
+    });
+
+    rawEl?.addEventListener('input', pushSharedPayload);
+    splitEl?.addEventListener('change', pushSharedPayload);
+    extractEl?.addEventListener('change', pushSharedPayload);
+    styleEl?.addEventListener('change', pushSharedPayload);
+    strategyEl?.addEventListener('change', pushSharedPayload);
+    minLenEl?.addEventListener('change', pushSharedPayload);
+    focusEl?.addEventListener('input', pushSharedPayload);
+
+    document.getElementById('ai-import-parse')?.addEventListener('click', () => {
+      pushSharedPayload();
+      window.dispatchEvent(new CustomEvent('nexus-import-controller:parse'));
+    });
+
+    document
+      .getElementById('ai-import-analyze')
+      ?.addEventListener('click', () => {
+        pushSharedPayload();
+        window.dispatchEvent(new CustomEvent('nexus-import-controller:ai'));
+      });
+
+    document.getElementById('ai-import-commit')?.addEventListener('click', () => {
+      pushSharedPayload();
+      window.dispatchEvent(new CustomEvent('nexus-import-controller:commit'));
+    });
+
+    if (window.lucide) window.lucide.createIcons();
   }
 
   escapeHtml(text) {

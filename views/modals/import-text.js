@@ -92,6 +92,19 @@ function log(msg) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function emitImportMonitor(stage, message, level = 'info', extra = {}) {
+  window.dispatchEvent(
+    new CustomEvent('nexus-import-monitor', {
+      detail: {
+        stage,
+        message,
+        level,
+        ...extra,
+      },
+    })
+  );
+}
+
 async function readFileAsText(file) {
   if (!file) return '';
   const fileName = file.name || '';
@@ -745,6 +758,11 @@ function init(dataManager) {
         statusEl.classList.add('text-green-400');
       }
       log(`Caricato file: ${file?.name || 'n/d'} (${txt.length} caratteri)`);
+      emitImportMonitor(
+        'file-loaded',
+        `File caricato: ${file?.name || 'n/d'} (${txt.length} caratteri)`,
+        'success'
+      );
     } catch (error) {
       textArea.value = '';
       if (statusEl) {
@@ -753,6 +771,11 @@ function init(dataManager) {
         statusEl.classList.add('text-red-400');
       }
       log(`Errore import file: ${error.message || error}`);
+      emitImportMonitor(
+        'error',
+        error.message || 'Errore durante il caricamento file.',
+        'error'
+      );
       toast?.error?.(error.message || 'Errore durante il caricamento file.');
       fileInput.value = '';
     }
@@ -762,42 +785,54 @@ function init(dataManager) {
 
   // IMPORT (solo parsing + anteprima base)
   runBtn.addEventListener('click', async () => {
-    const projectId = await dataManager.getCurrentProjectId();
-    if (!projectId) {
-      statusEl.textContent = 'Seleziona un progetto prima.';
-      return;
-    }
-    const raw = textArea.value.trim();
-    if (!raw) {
-      statusEl.textContent = 'Inserisci o carica un testo.';
-      return;
-    }
-    statusEl.textContent = 'Parsing in corso...';
-    commitBtn.disabled = true;
-    lastParsed = parseOnly(raw);
-    // Reset arricchimento precedente
-    lastAIEnrichment = null;
-    lastResult = {
-      ...lastParsed,
-      entities: {
-        characters: [],
-        locations: [],
-        objects: [],
-        geography: [],
-        history: [],
-        culture: [],
-      },
-      relations: [],
-      plotlines: [],
-      style: null,
-    };
-    statusEl.textContent =
-      'Parsing completato. Puoi importare e (facoltativamente) analizzare dopo.';
-    commitBtn.disabled = false;
-    aiRunBtn.disabled = false;
-    heroSuggestBtn.disabled = false; // potrà proporre stage dopo import effettivo
-    // Render preview
     try {
+      const projectId = await dataManager.getCurrentProjectId();
+      if (!projectId) {
+        statusEl.textContent = 'Seleziona un progetto prima.';
+        emitImportMonitor('error', 'Seleziona un progetto prima.', 'error');
+        return;
+      }
+      const raw = textArea.value.trim();
+      if (!raw) {
+        statusEl.textContent = 'Inserisci o carica un testo.';
+        emitImportMonitor('error', 'Inserisci o carica un testo.', 'error');
+        return;
+      }
+      statusEl.textContent = 'Parsing in corso...';
+      emitImportMonitor('parse-start', 'Parsing in corso...');
+      commitBtn.disabled = true;
+      lastParsed = parseOnly(raw);
+      // Reset arricchimento precedente
+      lastAIEnrichment = null;
+      lastResult = {
+        ...lastParsed,
+        entities: {
+          characters: [],
+          locations: [],
+          objects: [],
+          geography: [],
+          history: [],
+          culture: [],
+        },
+        relations: [],
+        plotlines: [],
+        style: null,
+      };
+      statusEl.textContent =
+        'Parsing completato. Puoi importare e (facoltativamente) analizzare dopo.';
+      emitImportMonitor(
+        'parse-complete',
+        `Parsing completato: ${lastResult.scenes?.length || 0} scene, ${lastResult.ideas?.length || 0} idee.`,
+        'success',
+        {
+          scenes: lastResult.scenes?.length || 0,
+          ideas: lastResult.ideas?.length || 0,
+        }
+      );
+      commitBtn.disabled = false;
+      aiRunBtn.disabled = false;
+      heroSuggestBtn.disabled = false; // potrà proporre stage dopo import effettivo
+      // Render preview
       selectionState = {
         scenes: new Set(),
         ideas: new Set(),
@@ -900,7 +935,14 @@ function init(dataManager) {
       bindSelectAll(selectAllGeographyEl, 'geography');
       bindSelectAll(selectAllHistoryEl, 'history');
       bindSelectAll(selectAllCultureEl, 'culture');
-    } catch { }
+    } catch (e) {
+      statusEl.textContent = 'Errore durante il parsing.';
+      emitImportMonitor(
+        'error',
+        e?.message || 'Errore durante il parsing.',
+        'error'
+      );
+    }
   });
 
   // COMMIT (importa ciò che è attualmente in lastResult – che può essere solo parsing o parsing+AI)
@@ -908,6 +950,7 @@ function init(dataManager) {
     const projectId = await dataManager.getCurrentProjectId();
     if (!projectId || !lastResult) return;
     statusEl.textContent = 'Import in corso...';
+    emitImportMonitor('commit-start', 'Import in corso...');
     commitBtn.disabled = true;
     // Filtra in base alla selezione
     const pick = (arr, type) =>
@@ -997,6 +1040,11 @@ function init(dataManager) {
 
     await commitToProject(dataManager, projectId, filtered, { mode });
     statusEl.textContent = 'Import completato.';
+    emitImportMonitor(
+      'commit-complete',
+      `Import completato (${filtered.scenes.length} scene, ${filtered.ideas.length} idee, ${filtered.entities.characters.length} personaggi).`,
+      'success'
+    );
   });
 
   // ANALISI AI differita (arricchisce lastResult e aggiorna anteprima)
@@ -1004,10 +1052,12 @@ function init(dataManager) {
     const raw = textArea.value.trim();
     if (!lastParsed || !raw) {
       statusEl.textContent = 'Nessun parsing iniziale.';
+      emitImportMonitor('error', 'Nessun parsing iniziale.', 'error');
       return;
     }
     aiRunBtn.disabled = true;
     aiRunBtn.textContent = 'Analisi...';
+    emitImportMonitor('ai-start', 'Analisi AI in corso...');
     try {
       const enrich = await runAIEnrichment(raw);
       lastAIEnrichment = enrich;
@@ -1066,9 +1116,15 @@ function init(dataManager) {
       });
       aiRunBtn.textContent = 'Analisi AI';
       statusEl.textContent = 'Analisi AI completata.';
+      emitImportMonitor(
+        'ai-complete',
+        `Analisi AI completata: ${lastResult.entities?.characters?.length || 0} personaggi, ${lastResult.plotlines?.length || 0} linee narrative.`,
+        'success'
+      );
     } catch (e) {
       statusEl.textContent = 'Errore analisi AI.';
       aiRunBtn.textContent = 'Analisi AI';
+      emitImportMonitor('error', e?.message || 'Errore analisi AI.', 'error');
     } finally {
       aiRunBtn.disabled = false;
     }
@@ -1195,6 +1251,47 @@ function init(dataManager) {
   });
 
   closeBtn.addEventListener('click', hide);
+
+  window.addEventListener('nexus-import-controller:set-text', e => {
+    const txt = e?.detail?.text;
+    if (typeof txt === 'string') {
+      textArea.value = txt;
+    }
+  });
+
+  window.addEventListener('nexus-import-controller:set-options', e => {
+    const d = e?.detail || {};
+    if (typeof d.splitScenes === 'boolean' && splitScenesEl) {
+      splitScenesEl.checked = d.splitScenes;
+    }
+    if (typeof d.extractEntities === 'boolean' && extractEntitiesEl) {
+      extractEntitiesEl.checked = d.extractEntities;
+    }
+    if (typeof d.analyzeStyle === 'boolean' && analyzeStyleEl) {
+      analyzeStyleEl.checked = d.analyzeStyle;
+    }
+    if (typeof d.strategy === 'string' && splitStrategyEl) {
+      splitStrategyEl.value = d.strategy;
+    }
+    if (typeof d.minSceneLength === 'number' && minSceneLenEl) {
+      minSceneLenEl.value = String(d.minSceneLength);
+    }
+    if (typeof d.focus === 'string' && analysisFocusEl) {
+      analysisFocusEl.value = d.focus;
+    }
+  });
+
+  window.addEventListener('nexus-import-controller:parse', () => {
+    runBtn?.click();
+  });
+
+  window.addEventListener('nexus-import-controller:ai', () => {
+    aiRunBtn?.click();
+  });
+
+  window.addEventListener('nexus-import-controller:commit', () => {
+    commitBtn?.click();
+  });
 
   return { open: show, hide };
 }

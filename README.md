@@ -48,6 +48,27 @@ Funziona direttamente nel browser e anche offline, così puoi lavorare ovunque e
 - Node.js ≥ 18
 - NPM
 
+## Workspace locale (allineato)
+
+Root operativa:
+
+- `/home/pioshin/AI/Projects`
+
+Componenti attivi collegati:
+
+- Frontend Writer's Nexus (questa repo):
+  - `/home/pioshin/AI/Projects/P_NOOS/Writers_Nexus/WN_Frontend`
+- NOOS (architettura/contratti Hub):
+  - `/home/pioshin/AI/Projects/P_NOOS/Writers_Nexus/NOOS`
+- ADAM-suite (engine runtime BKA/KRONK):
+  - `/home/pioshin/AI/Projects/P_NOOS/ADAM-suite`
+- IODA (Digital Assistant, integrazione futura):
+  - `/home/pioshin/AI/Projects/P_DIGITAL_ASSISTANT/IODA`
+
+Scope escluso (legacy):
+
+- `/home/pioshin/AI/Projects/P_NOOS/OLD/*`
+
 ## Avvio locale
 
 1. Installa le dipendenze
