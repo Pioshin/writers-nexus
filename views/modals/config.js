@@ -1,11 +1,14 @@
 import { DataManager } from '../../DataManager.js';
 import { toast } from '../shared/toast.js';
 import { AIService } from '../../ai/AIService.js';
+import { HubClient } from '../../HubClient.js';
+import { HubSync } from '../../HubSync.js';
 
 let modal, form, saveBtn, cancelBtn;
 let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
 let genericModelContainer, googleModelContainer, configGoogleModelSelect;
 let refreshGoogleModelsBtn, googleModelsStatusEl, genericModelsStatusEl, modelSuggestionsEl, aiModelListSelect;
+let hubEnabledToggle, hubUrlInput, hubTokenInput, testHubBtn, hubTestStatusEl;
 let isInitialized = false;
 
 function normalizeBaseUrl(url) {
@@ -42,11 +45,19 @@ function init() {
   aiModelListSelect = document.getElementById('config-ai-model-list');
   const testConnectionBtn = document.getElementById('test-connection-btn');
 
+  // Hub elements
+  hubEnabledToggle = document.getElementById('config-hub-enabled');
+  hubUrlInput = document.getElementById('config-hub-url');
+  hubTokenInput = document.getElementById('config-hub-token');
+  testHubBtn = document.getElementById('test-hub-btn');
+  hubTestStatusEl = document.getElementById('hub-test-status');
+
   cancelBtn.addEventListener('click', close);
   saveBtn.addEventListener('click', save);
   aiProviderSelect.addEventListener('change', updateAIProviderUI);
   refreshGoogleModelsBtn?.addEventListener('click', loadGoogleModels);
   testConnectionBtn?.addEventListener('click', testConnection);
+  testHubBtn?.addEventListener('click', testHubConnection);
   aiModelListSelect?.addEventListener('change', () => {
     const selected = aiModelListSelect.value;
     if (selected) aiModelInput.value = selected;
@@ -247,6 +258,16 @@ async function open() {
   if (aiApiKeyInput)
     aiApiKeyInput.value = settings.aiApiKey || '';
 
+  // Hub fields
+  if (hubEnabledToggle)
+    hubEnabledToggle.checked = !!settings.hubEnabled;
+  if (hubUrlInput)
+    hubUrlInput.value = settings.hubUrl || 'http://127.0.0.1:9090';
+  if (hubTokenInput)
+    hubTokenInput.value = settings.hubToken || '';
+  if (hubTestStatusEl)
+    hubTestStatusEl.textContent = '';
+
   if (genericModelsStatusEl) {
     genericModelsStatusEl.textContent = '';
   }
@@ -295,11 +316,18 @@ async function save(e) {
       : inputModel || selectedFromList;
   const apiKey = aiApiKeyInput?.value.trim() || '';
 
+  const hubEnabled = hubEnabledToggle?.checked || false;
+  const hubUrl = hubUrlInput?.value.trim() || '';
+  const hubToken = hubTokenInput?.value.trim() || '';
+
   await DataManager.saveSettings({
     aiProvider: provider,
     aiBaseUrl: aiBaseUrlInput?.value.trim() || '',
     aiModel: model,
     aiApiKey: apiKey,
+    hubEnabled,
+    hubUrl,
+    hubToken,
   });
 
   AIService.init({
@@ -309,8 +337,39 @@ async function save(e) {
     model: model
   });
 
+  // Reconfigure HubSync live
+  HubSync.configure({ hubEnabled, hubUrl, hubToken });
+
   close();
-  toast.success('Configurazione AI salvata.');
+  toast.success('Configurazione salvata.');
+}
+
+async function testHubConnection() {
+  if (testHubBtn) { testHubBtn.textContent = 'Testing...'; testHubBtn.disabled = true; }
+  if (hubTestStatusEl) hubTestStatusEl.textContent = '';
+
+  const baseUrl = (hubUrlInput?.value || '').trim().replace(/\/+$/, '');
+  const token = (hubTokenInput?.value || '').trim();
+
+  if (!baseUrl) {
+    if (hubTestStatusEl) hubTestStatusEl.textContent = 'Inserisci un URL.';
+    if (testHubBtn) { testHubBtn.textContent = 'Test Connessione'; testHubBtn.disabled = false; }
+    return;
+  }
+
+  try {
+    const hub = new HubClient({ baseUrl, token });
+    const data = await hub.health();
+    const msg = `Connessione OK! (${data.status || 'ok'})`;
+    if (hubTestStatusEl) hubTestStatusEl.textContent = msg;
+    toast.success(msg);
+  } catch (e) {
+    const errMsg = `Errore: ${e.message}`;
+    if (hubTestStatusEl) hubTestStatusEl.textContent = errMsg;
+    toast.error(`Hub non raggiungibile: ${e.message}`);
+  } finally {
+    if (testHubBtn) { testHubBtn.textContent = 'Test Connessione'; testHubBtn.disabled = false; }
+  }
 }
 
 export default { init, open, close };

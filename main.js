@@ -4,6 +4,7 @@ import { ThemeManager } from './ThemeManager.js';
 import { AIService } from './ai/AIService.js';
 import { AIPanel } from './ai/AIPanel.js';
 import { ConsistencyEngine } from './js/ConsistencyEngine.js';
+import { HubSync } from './HubSync.js';
 
 // --- STATE ---
 let syncModal = null;
@@ -132,6 +133,10 @@ async function initializeApp() {
 
   setupEventListeners();
   DataManager.init(uiNotifier);
+
+  // ── NOOS Hub dual-write (M2) ──
+  HubSync.install(DataManager);
+  HubSync.configure(settings);
 
   const expectedOrigin = 'http://127.0.0.1:55099';
   if (window.location.origin !== expectedOrigin) {
