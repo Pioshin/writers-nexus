@@ -1,5 +1,6 @@
 import { AIService } from './AIService.js';
 import { AIWorldbuilding } from './AIWorldbuilding.js';
+import { HubJobService } from './HubJobService.js';
 
 export class AIPanel {
   constructor(dataManager) {
@@ -20,11 +21,14 @@ export class AIPanel {
       enabled: false,
       status: 'Pronto',
     };
+    this._hubAvailable = false;
+    this._activeHubJobId = null;
 
     this.init();
     this.setupEventListeners();
     this.setupModalObserver();
     this.setupImportMonitorBridge();
+    this._checkHubAvailability();
   }
 
   async init() {
@@ -381,6 +385,27 @@ export class AIPanel {
       </button>
     `).join('');
 
+    // ── Hub Job actions (NOOS workers) ──
+    if (this._hubAvailable) {
+      const hubActions = this._getHubActionsForView(viewName);
+      if (hubActions.length > 0) {
+        const separator = `<div class="col-span-2 flex items-center gap-2 pt-1"><hr class="flex-1 border-accent/30"/><span class="text-[9px] uppercase tracking-wider text-accent/60 whitespace-nowrap">NOOS Hub</span><hr class="flex-1 border-accent/30"/></div>`;
+        actionsGrid.insertAdjacentHTML('beforeend', separator + hubActions.map(ha => `
+          <button class="hub-action-btn flex items-center gap-2 px-2 py-1.5 bg-accent/10 hover:bg-accent/25 border border-accent/30 rounded-lg text-xs transition-colors" data-hub-action="${ha.action}" data-hub-engine="${ha.engine}" data-hub-task="${ha.taskType}">
+            <i data-lucide="${ha.icon}" class="w-3 h-3 text-accent"></i>
+            <span class="truncate text-accent">${ha.label}</span>
+          </button>
+        `).join(''));
+
+        // Bind Hub action clicks
+        actionsGrid.querySelectorAll('.hub-action-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            this._executeHubJob(btn.dataset.hubEngine, btn.dataset.hubTask, btn.dataset.hubAction);
+          });
+        });
+      }
+    }
+
     // Re-initialize lucide icons
     if (window.lucide) window.lucide.createIcons();
 
@@ -625,6 +650,281 @@ export class AIPanel {
     // Simple bold formatting
     let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return formatted;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  NOOS Hub Job integration
+  // ═══════════════════════════════════════════════════════
+
+  async _checkHubAvailability() {
+    try {
+      this._hubAvailable = await HubJobService.isAvailable();
+    } catch {
+      this._hubAvailable = false;
+    }
+    // Re-check every 30s
+    setTimeout(() => this._checkHubAvailability(), 30_000);
+  }
+
+  /** Return Hub action buttons for a given view. */
+  _getHubActionsForView(viewName) {
+    const hubActionsByView = {
+      writing: [
+        { icon: 'cpu', label: 'Genera Capitolo', action: 'write-chapter', engine: 'KRONK', taskType: 'write.chapter' },
+        { icon: 'refresh-cw', label: 'Revisiona Capitolo', action: 'revise-chapter', engine: 'KRONK', taskType: 'revise.chapter' },
+      ],
+      editing: [
+        { icon: 'cpu', label: 'Riscrivi Sezione', action: 'rewrite-section', engine: 'KRONK', taskType: 'rewrite.section' },
+        { icon: 'refresh-cw', label: 'Revisiona Capitolo', action: 'revise-chapter', engine: 'KRONK', taskType: 'revise.chapter' },
+      ],
+      analysis: [
+        { icon: 'cpu', label: 'Analizza Manoscritto', action: 'analyze-manuscript', engine: 'BKA', taskType: 'analyze.manuscript' },
+        { icon: 'search', label: 'Check Consistenza', action: 'analyze-consistency', engine: 'BKA', taskType: 'analyze.consistency' },
+        { icon: 'list', label: 'Estrai Entità', action: 'extract-entities', engine: 'BKA', taskType: 'extract.entities' },
+      ],
+    };
+    return hubActionsByView[viewName] || [];
+  }
+
+  /**
+   * Execute a NOOS Hub job from a quick action button.
+   * Gathers context from the current project and scene, submits the job,
+   * shows progress in chat, and displays the result.
+   */
+  async _executeHubJob(engine, taskType, actionLabel) {
+    const projectId = await this.dataManager.getCurrentProjectId();
+    if (!projectId) {
+      this.appendMessage('system', 'Nessun progetto attivo. Seleziona un progetto prima di usare le azioni Hub.');
+      return;
+    }
+
+    // Avoid duplicate concurrent jobs
+    if (this._activeHubJobId) {
+      this.appendMessage('system', 'Un job Hub è già in corso. Attendi il completamento o annullalo.');
+      return;
+    }
+
+    // ── Build payload from context ──
+    let payload;
+    try {
+      payload = await this._buildHubPayload(engine, taskType, projectId);
+    } catch (e) {
+      this.appendMessage('system', `Errore preparazione dati: ${e.message}`);
+      return;
+    }
+
+    // ── Show in chat ──
+    const taskLabels = {
+      'write.chapter': 'Generazione capitolo',
+      'revise.chapter': 'Revisione capitolo',
+      'rewrite.section': 'Riscrittura sezione',
+      'analyze.manuscript': 'Analisi manoscritto',
+      'analyze.consistency': 'Check consistenza',
+      'extract.entities': 'Estrazione entità',
+    };
+    const label = taskLabels[taskType] || taskType;
+    this.appendMessage('user', `🔄 ${label} (via NOOS Hub — ${engine})`);
+
+    // ── Progress container ──
+    const progressId = this._showHubProgress(label);
+
+    try {
+      this._activeHubJobId = 'pending'; // Will be set on first progress
+
+      const result = await HubJobService.submitJob(engine, taskType, projectId, payload, {
+        onProgress: (p) => {
+          this._updateHubProgress(progressId, p);
+        },
+      });
+
+      this._removeHubProgress(progressId);
+      this._activeHubJobId = null;
+
+      // ── Display result ──
+      this._displayHubResult(engine, taskType, result);
+    } catch (error) {
+      this._removeHubProgress(progressId);
+      this._activeHubJobId = null;
+      this.appendMessage('system', `❌ ${label} fallita: ${error.message}`);
+    }
+  }
+
+  /**
+   * Build the job payload from current project/scene context.
+   */
+  async _buildHubPayload(engine, taskType, projectId) {
+    const project = await this.dataManager.getProject(projectId);
+
+    if (engine === 'KRONK') {
+      if (taskType === 'write.chapter') {
+        // Get scene list for context
+        const scenes = await this.dataManager.getProjectItems(projectId, 'scenes');
+        scenes.sort((a, b) => (a.order || 0) - (b.order || 0));
+        const characters = await this.dataManager.getProjectItems(projectId, 'characters');
+        const charNames = characters.map(c => c.name).filter(Boolean);
+
+        return {
+          title: `Capitolo ${scenes.length + 1}`,
+          synopsis: project.premise || 'Continua la storia.',
+          characters: charNames,
+          previousContext: scenes.length > 0
+            ? scenes.slice(-2).map(s => `[${s.title}] ${(s.content || '').substring(0, 500)}`).join('\n---\n')
+            : '',
+          chapterNumber: scenes.length + 1,
+        };
+      }
+
+      if (taskType === 'revise.chapter') {
+        const sceneId = await this.dataManager.getCurrentSceneId?.();
+        let text = '';
+        if (sceneId) {
+          const scene = await this.dataManager.getScene(sceneId);
+          text = scene?.content || '';
+        }
+        if (!text) throw new Error('Nessuna scena attiva con testo da revisionare.');
+        return {
+          text,
+          instructions: 'Migliora stile, coerenza e ritmo mantenendo la voce narrativa.',
+          focusAreas: ['style', 'pacing', 'coherence'],
+        };
+      }
+
+      if (taskType === 'rewrite.section') {
+        // Use selected text or current scene
+        const sceneId = await this.dataManager.getCurrentSceneId?.();
+        let text = '';
+        if (sceneId) {
+          const scene = await this.dataManager.getScene(sceneId);
+          text = scene?.content || '';
+        }
+        if (!text) throw new Error('Nessun testo da riscrivere. Seleziona una scena.');
+        return {
+          text: text.substring(0, 2000), // Limit section size
+          instructions: 'Riscrivi migliorando la prosa e l\'impatto narrativo.',
+          style: 'literary',
+        };
+      }
+    }
+
+    if (engine === 'BKA') {
+      if (taskType === 'analyze.manuscript') {
+        const scenes = await this.dataManager.getProjectItems(projectId, 'scenes');
+        const fullText = scenes
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+          .map(s => s.content || '')
+          .join('\n\n---\n\n');
+        if (!fullText.trim()) throw new Error('Nessun testo nel manoscritto da analizzare.');
+        return {
+          text: fullText.substring(0, 10000), // Limit for LLM context
+          analysisDepth: 'standard',
+        };
+      }
+
+      if (taskType === 'analyze.consistency') {
+        const scenes = await this.dataManager.getProjectItems(projectId, 'scenes');
+        const sceneData = scenes
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+          .map(s => ({ title: s.title, content: (s.content || '').substring(0, 2000) }));
+        if (sceneData.length === 0) throw new Error('Nessuna scena da analizzare.');
+        return {
+          scenes: sceneData,
+          focusAreas: ['characters', 'timeline', 'setting'],
+        };
+      }
+
+      if (taskType === 'extract.entities') {
+        const scenes = await this.dataManager.getProjectItems(projectId, 'scenes');
+        const fullText = scenes
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+          .map(s => s.content || '')
+          .join('\n\n');
+        if (!fullText.trim()) throw new Error('Nessun testo da cui estrarre entità.');
+        return {
+          text: fullText.substring(0, 10000),
+          entityTypes: ['characters', 'locations', 'objects'],
+        };
+      }
+    }
+
+    return {};
+  }
+
+  /** Show a Hub job progress widget in chat. */
+  _showHubProgress(label) {
+    const id = 'hub-progress-' + Date.now();
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = 'mr-auto w-full max-w-[90%] p-3 bg-secondary/50 rounded-lg rounded-tl-none border border-accent/20 text-sm';
+    div.innerHTML = `
+      <div class="flex items-center gap-2 mb-2">
+        <i data-lucide="loader-2" class="w-4 h-4 text-accent animate-spin"></i>
+        <span class="text-accent font-semibold text-xs">${label}</span>
+      </div>
+      <div class="w-full bg-primary/50 rounded-full h-1.5 mb-1">
+        <div class="hub-progress-bar bg-accent h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <p class="hub-progress-msg text-[10px] text-secondary">In attesa...</p>
+    `;
+    this.chatContainer.appendChild(div);
+    this.scrollToBottom();
+    if (window.lucide) window.lucide.createIcons();
+    return id;
+  }
+
+  /** Update Hub progress widget. */
+  _updateHubProgress(id, { phase, percent, message }) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const bar = el.querySelector('.hub-progress-bar');
+    const msg = el.querySelector('.hub-progress-msg');
+    if (bar && percent >= 0) {
+      bar.style.width = `${Math.min(percent, 100)}%`;
+    }
+    if (msg) {
+      msg.textContent = message || phase || 'Elaborazione...';
+    }
+    this.scrollToBottom();
+  }
+
+  /** Remove Hub progress widget after completion. */
+  _removeHubProgress(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  /** Display Hub job result in chat. */
+  _displayHubResult(engine, taskType, jobResource) {
+    const result = jobResource.result || jobResource;
+    const artifact = result?.artifact;
+
+    if (!artifact && !result?.resultId) {
+      this.appendMessage('assistant', '✅ Job completato, ma nessun artefatto restituito.');
+      return;
+    }
+
+    // Format based on task type
+    if (engine === 'KRONK') {
+      const text = typeof artifact === 'string'
+        ? artifact
+        : artifact?.text || artifact?.content || JSON.stringify(artifact, null, 2);
+      this.appendMessage('assistant', `✅ **Risultato ${taskType}:**\n\n${text}`);
+    } else if (engine === 'BKA') {
+      const formatted = typeof artifact === 'string'
+        ? artifact
+        : JSON.stringify(artifact, null, 2);
+      this.appendMessage('assistant', `✅ **Analisi completata (${taskType}):**\n\n\`\`\`\n${formatted}\n\`\`\``);
+    } else {
+      this.appendMessage('assistant', `✅ Job completato:\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``);
+    }
+
+    // Show quality flags if present
+    const flags = result?.qualityFlags;
+    if (flags && Object.keys(flags).length > 0) {
+      const flagText = Object.entries(flags)
+        .map(([k, v]) => `• ${k}: ${v}`)
+        .join('\n');
+      this.appendMessage('system', `📊 Quality flags:\n${flagText}`);
+    }
   }
 
   async buildSystemPrompt() {

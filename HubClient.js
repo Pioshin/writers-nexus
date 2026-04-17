@@ -139,7 +139,38 @@ export class HubClient {
     );
   }
 
-  // ─────────────────── Jobs (read-only for now) ───────────────────
+  // ─────────────────── Jobs ───────────────────
+
+  /**
+   * Create (queue) a new AI job on the NOOS Hub.
+   *
+   * @param {string}  engine   — 'BKA' | 'KRONK' | 'IMPORT'
+   * @param {string}  taskType — e.g. 'analyze-chapter', 'brainstorm', 'import-docx'
+   * @param {string}  projectId
+   * @param {object}  [payload={}] — engine-specific payload
+   * @param {object}  [opts]
+   * @param {string}  [opts.priority='standard'] — 'interactive' | 'standard' | 'batch'
+   * @param {string}  [opts.idempotencyKey]      — dedup key (auto-generated if omitted)
+   * @param {string}  [opts.contractVersion='1']
+   * @returns {Promise<object>} JobQueuedResponse { jobId, status, engine, taskType, createdAt, queuePosition, estimatedWaitMs }
+   */
+  async createJob(engine, taskType, projectId, payload = {}, {
+    priority = 'standard',
+    idempotencyKey = '',
+    contractVersion = '1',
+  } = {}) {
+    const key = idempotencyKey || `${engine}_${taskType}_${projectId}_${Date.now()}`;
+    return this._post('/v1/jobs/create', {
+      engine,
+      taskType,
+      projectId,
+      priority,
+      requestedByApp: this.app,
+      idempotencyKey: key,
+      jobContractVersion: contractVersion,
+      payload,
+    });
+  }
 
   /** @returns {Promise<object>} JobResource */
   async getJob(jobId) {
@@ -153,6 +184,17 @@ export class HubClient {
     if (engine) params.set('engine', engine);
     if (projectId) params.set('projectId', projectId);
     return this._get(`/v1/jobs?${params}`);
+  }
+
+  // ─────────────────── Migration ───────────────────
+
+  /**
+   * Import a full IDB dump (from DataManager.exportAllProjects()) into NOOS Hub.
+   * @param {object} idbDump — the JSON blob returned by DataManager.exportAllProjects()
+   * @returns {Promise<object>} IdbImportResponse
+   */
+  async migrateIdb(idbDump) {
+    return this._post('/v1/migrate/import-idb', idbDump);
   }
 
   // ─────────────────── SSE Events ───────────────────

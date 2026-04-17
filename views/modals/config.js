@@ -9,6 +9,7 @@ let aiBaseUrlInput, aiModelInput, aiApiKeyInput, aiProviderSelect;
 let genericModelContainer, googleModelContainer, configGoogleModelSelect;
 let refreshGoogleModelsBtn, googleModelsStatusEl, genericModelsStatusEl, modelSuggestionsEl, aiModelListSelect;
 let hubEnabledToggle, hubUrlInput, hubTokenInput, testHubBtn, hubTestStatusEl;
+let syncAllHubBtn, syncAllHubStatusEl;
 let isInitialized = false;
 
 function normalizeBaseUrl(url) {
@@ -50,7 +51,9 @@ function init() {
   hubUrlInput = document.getElementById('config-hub-url');
   hubTokenInput = document.getElementById('config-hub-token');
   testHubBtn = document.getElementById('test-hub-btn');
-  hubTestStatusEl = document.getElementById('hub-test-status');
+  hubTestStatusEl = document.getElementById('hub-test-result');
+  syncAllHubBtn = document.getElementById('sync-all-hub-btn');
+  syncAllHubStatusEl = document.getElementById('sync-all-hub-status');
 
   cancelBtn.addEventListener('click', close);
   saveBtn.addEventListener('click', save);
@@ -58,6 +61,7 @@ function init() {
   refreshGoogleModelsBtn?.addEventListener('click', loadGoogleModels);
   testConnectionBtn?.addEventListener('click', testConnection);
   testHubBtn?.addEventListener('click', testHubConnection);
+  syncAllHubBtn?.addEventListener('click', syncAllToHub);
   aiModelListSelect?.addEventListener('change', () => {
     const selected = aiModelListSelect.value;
     if (selected) aiModelInput.value = selected;
@@ -369,6 +373,46 @@ async function testHubConnection() {
     toast.error(`Hub non raggiungibile: ${e.message}`);
   } finally {
     if (testHubBtn) { testHubBtn.textContent = 'Test Connessione'; testHubBtn.disabled = false; }
+  }
+}
+
+async function syncAllToHub() {
+  if (syncAllHubBtn) { syncAllHubBtn.disabled = true; syncAllHubBtn.textContent = 'Sincronizzazione…'; }
+  if (syncAllHubStatusEl) syncAllHubStatusEl.textContent = '';
+
+  const baseUrl = (hubUrlInput?.value || '').trim().replace(/\/+$/, '');
+  const token = (hubTokenInput?.value || '').trim();
+
+  if (!baseUrl) {
+    if (syncAllHubStatusEl) syncAllHubStatusEl.textContent = 'Inserisci un Hub URL prima.';
+    if (syncAllHubBtn) { syncAllHubBtn.disabled = false; syncAllHubBtn.textContent = '⬆ Sincronizza tutti i progetti al Hub'; }
+    return;
+  }
+
+  try {
+    // 1. Export everything from IndexedDB
+    const dump = await DataManager.exportAllProjects();
+    const projectCount = dump?.projects?.length || 0;
+    if (!projectCount) {
+      if (syncAllHubStatusEl) syncAllHubStatusEl.textContent = 'Nessun progetto da sincronizzare.';
+      toast.info('Nessun progetto presente in locale.');
+      return;
+    }
+
+    // 2. Send to NOOS Hub migrate endpoint
+    const hub = new HubClient({ baseUrl, token });
+    const result = await hub.migrateIdb(dump);
+
+    const msg = `✓ ${result.projectsProcessed} progetti sincronizzati (${result.projectsCreated} nuovi, ${result.projectsUpdated} aggiornati, ${result.totalEntities} entità)`;
+    if (syncAllHubStatusEl) syncAllHubStatusEl.textContent = msg;
+    toast.success(msg);
+  } catch (e) {
+    console.error('Sync All to Hub failed:', e);
+    const errMsg = `Errore: ${e.message}`;
+    if (syncAllHubStatusEl) syncAllHubStatusEl.textContent = errMsg;
+    toast.error(`Sincronizzazione fallita: ${e.message}`);
+  } finally {
+    if (syncAllHubBtn) { syncAllHubBtn.disabled = false; syncAllHubBtn.textContent = '⬆ Sincronizza tutti i progetti al Hub'; }
   }
 }
 

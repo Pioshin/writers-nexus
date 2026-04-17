@@ -1,4 +1,5 @@
 import { toast } from '../shared/toast.js';
+import { HubJobService } from '../../ai/HubJobService.js';
 let DataManager, loadModal;
 let charts = { hero: null, pie: null };
 
@@ -442,6 +443,145 @@ async function renderAnalysis() {
   styleEl.innerHTML = `<p class="text-secondary">Profilo stile sarà popolato dall'import IA (voice, pacing, lessico, tono).</p>`;
 }
 
+// ─── Hub AI Analysis ───
+
+async function initHubAnalysis() {
+  const section     = document.getElementById('hub-analysis-section');
+  const btnManuscript   = document.getElementById('hub-analyze-manuscript');
+  const btnConsistency  = document.getElementById('hub-analyze-consistency');
+  const btnEntities     = document.getElementById('hub-extract-entities');
+  const progressWrap    = document.getElementById('hub-analysis-progress');
+  const progressLabel   = document.getElementById('hub-analysis-progress-label');
+  const progressBar     = document.getElementById('hub-analysis-progress-bar');
+  const progressMsg     = document.getElementById('hub-analysis-progress-msg');
+  const resultEl        = document.getElementById('hub-analysis-result');
+
+  if (!section) return;
+
+  const hubOk = await HubJobService.isAvailable();
+  if (!hubOk) return;
+  section.classList.remove('hidden');
+
+  let busy = false;
+
+  function setBusy(b, label) {
+    busy = b;
+    btnManuscript.disabled = b;
+    btnConsistency.disabled = b;
+    btnEntities.disabled = b;
+    if (b) {
+      progressWrap.classList.remove('hidden');
+      progressLabel.textContent = label || 'Analisi in corso...';
+      progressBar.style.width = '0%';
+      progressMsg.textContent = 'In attesa...';
+      resultEl.classList.add('hidden');
+    } else {
+      progressWrap.classList.add('hidden');
+    }
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function showResult(content) {
+    resultEl.classList.remove('hidden');
+    if (typeof content === 'string') {
+      resultEl.textContent = content;
+    } else {
+      resultEl.textContent = JSON.stringify(content, null, 2);
+    }
+  }
+
+  function onProgress(p) {
+    if (p.percent >= 0) progressBar.style.width = `${Math.min(p.percent, 100)}%`;
+    progressMsg.textContent = p.message || p.phase || 'Elaborazione...';
+  }
+
+  // Analyze Manuscript
+  btnManuscript.addEventListener('click', async () => {
+    if (busy) return;
+    const projectId = await DataManager.getCurrentProjectId();
+    if (!projectId) return;
+
+    setBusy(true, 'Analisi manoscritto...');
+    try {
+      const scenes = await DataManager.getProjectItems(projectId, 'scenes');
+      const fullText = scenes
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map(s => s.content || '')
+        .join('\n\n---\n\n');
+      if (!fullText.trim()) throw new Error('Nessun testo nel manoscritto.');
+
+      const result = await HubJobService.analyzeManuscript(projectId, {
+        text: fullText.substring(0, 10000),
+        analysisDepth: 'standard',
+      }, onProgress);
+
+      setBusy(false);
+      const artifact = result?.result?.artifact || result?.artifact;
+      showResult(artifact || 'Analisi completata (nessun dettaglio restituito).');
+    } catch (err) {
+      setBusy(false);
+      showResult(`Errore: ${err.message}`);
+    }
+  });
+
+  // Consistency Check
+  btnConsistency.addEventListener('click', async () => {
+    if (busy) return;
+    const projectId = await DataManager.getCurrentProjectId();
+    if (!projectId) return;
+
+    setBusy(true, 'Check consistenza...');
+    try {
+      const scenes = await DataManager.getProjectItems(projectId, 'scenes');
+      const sceneData = scenes
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map(s => ({ title: s.title, content: (s.content || '').substring(0, 2000) }));
+      if (sceneData.length === 0) throw new Error('Nessuna scena da analizzare.');
+
+      const result = await HubJobService.analyzeConsistency(projectId, {
+        scenes: sceneData,
+        focusAreas: ['characters', 'timeline', 'setting'],
+      }, onProgress);
+
+      setBusy(false);
+      const artifact = result?.result?.artifact || result?.artifact;
+      showResult(artifact || 'Check completato.');
+    } catch (err) {
+      setBusy(false);
+      showResult(`Errore: ${err.message}`);
+    }
+  });
+
+  // Extract Entities
+  btnEntities.addEventListener('click', async () => {
+    if (busy) return;
+    const projectId = await DataManager.getCurrentProjectId();
+    if (!projectId) return;
+
+    setBusy(true, 'Estrazione entità...');
+    try {
+      const scenes = await DataManager.getProjectItems(projectId, 'scenes');
+      const fullText = scenes
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map(s => s.content || '')
+        .join('\n\n');
+      if (!fullText.trim()) throw new Error('Nessun testo da cui estrarre.');
+
+      const result = await HubJobService.extractEntities(projectId, {
+        text: fullText.substring(0, 10000),
+        entityTypes: ['characters', 'locations', 'objects'],
+      }, onProgress);
+
+      setBusy(false);
+      const artifact = result?.result?.artifact || result?.artifact;
+      showResult(artifact || 'Estrazione completata.');
+    } catch (err) {
+      setBusy(false);
+      showResult(`Errore: ${err.message}`);
+    }
+  });
+}
+
 export default {
   init: function (dataManager, modalLoader) {
     DataManager = dataManager;
@@ -516,5 +656,6 @@ export default {
         }
       });
     renderAnalysis();
+    initHubAnalysis();
   },
 };

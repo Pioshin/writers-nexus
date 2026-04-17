@@ -31,3 +31,21 @@ pnpm-debug.log*
 
 # Report locali
 lint-report.txt
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python compiled
+__pycache__/
+*.py[cod]
+*$pyc
+*.so
+.Python
+
+# pip
+*.egg-info/
+.eggs/
+dist/
+build/

@@ -21,7 +21,9 @@ let stageBadgeEl,
   stageCancelBtn,
   stageFeedbackEl;
 import { StageUndo } from '../shared/stage-undo.js';
+import { HubJobService } from '../../ai/HubJobService.js';
 const WORDS_PER_PAGE = 300;
+let _hubJobActive = false;
 
 async function init(dataManager, modalLoader, viewSwitcher) {
   DataManager = dataManager;
@@ -165,6 +167,9 @@ async function init(dataManager, modalLoader, viewSwitcher) {
     });
   } catch { }
 
+  // ── Hub inline toolbar ──
+  initWritingHubToolbar();
+
   // Manuscript overlay events
   document
     .getElementById('open-manuscript-btn')
@@ -213,6 +218,139 @@ async function init(dataManager, modalLoader, viewSwitcher) {
       blocksContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
     }
   });
+}
+
+// ─── Hub inline toolbar (writing view) ───
+
+async function initWritingHubToolbar() {
+  const toolbar    = document.getElementById('writing-hub-toolbar');
+  const genBtn     = document.getElementById('writing-hub-generate');
+  const revBtn     = document.getElementById('writing-hub-revise');
+  const progressEl = document.getElementById('writing-hub-progress');
+  const progressMsg= document.getElementById('writing-hub-progress-msg');
+  const cancelBtn  = document.getElementById('writing-hub-cancel');
+  const resultWrap = document.getElementById('writing-hub-result');
+  const resultText = document.getElementById('writing-hub-result-text');
+  const insertBtn  = document.getElementById('writing-hub-insert');
+  const dismissBtn = document.getElementById('writing-hub-dismiss');
+
+  if (!toolbar) return;
+
+  const hubOk = await HubJobService.isAvailable();
+  if (!hubOk) return;
+  toolbar.classList.remove('hidden');
+
+  function setBusy(busy, msg) {
+    _hubJobActive = busy;
+    genBtn.disabled = busy;
+    revBtn.disabled = busy;
+    if (busy) {
+      progressEl.classList.remove('hidden');
+      progressMsg.textContent = msg || 'Elaborazione...';
+    } else {
+      progressEl.classList.add('hidden');
+    }
+  }
+
+  function showHubResult(text) {
+    resultWrap.classList.remove('hidden');
+    resultText.textContent = text;
+  }
+
+  function hideHubResult() {
+    resultWrap.classList.add('hidden');
+    resultText.textContent = '';
+  }
+
+  // Generate chapter
+  genBtn.addEventListener('click', async () => {
+    if (_hubJobActive || !currentScene) return;
+    const projectId = await DataManager.getCurrentProjectId();
+    if (!projectId) return;
+
+    setBusy(true, 'Generazione capitolo...');
+    hideHubResult();
+
+    try {
+      const characters = await DataManager.getProjectItems(projectId, 'characters');
+      const charNames = characters.map(c => c.name).filter(Boolean);
+      const sceneIdx = orderedScenes.findIndex(s => s.id === currentScene.id);
+
+      const payload = {
+        title: currentScene.title || `Scena ${sceneIdx + 1}`,
+        synopsis: currentScene.synopsis || 'Continua la storia.',
+        characters: charNames,
+        previousContext: currentScene.content ? currentScene.content.substring(0, 1000) : '',
+        chapterNumber: sceneIdx + 1,
+      };
+
+      const result = await HubJobService.writeChapter(projectId, payload, (p) => {
+        progressMsg.textContent = p.message || p.phase || 'Generazione...';
+      });
+
+      setBusy(false);
+      const artifact = result?.result?.artifact || result?.artifact;
+      const text = typeof artifact === 'string' ? artifact : artifact?.text || artifact?.content || '';
+      if (text) showHubResult(text);
+    } catch (err) {
+      setBusy(false);
+      showHubResult(`Errore: ${err.message}`);
+    }
+  });
+
+  // Revise current scene
+  revBtn.addEventListener('click', async () => {
+    if (_hubJobActive || !currentScene) return;
+    const projectId = await DataManager.getCurrentProjectId();
+    if (!projectId) return;
+    const sceneText = currentScene.content || '';
+    if (!sceneText.trim()) return;
+
+    setBusy(true, 'Revisione scena...');
+    hideHubResult();
+
+    try {
+      const payload = {
+        text: sceneText,
+        instructions: 'Migliora stile, coerenza e ritmo mantenendo la voce narrativa.',
+        focusAreas: ['style', 'pacing', 'coherence'],
+      };
+
+      const result = await HubJobService.reviseChapter(projectId, payload, (p) => {
+        progressMsg.textContent = p.message || p.phase || 'Revisione...';
+      });
+
+      setBusy(false);
+      const artifact = result?.result?.artifact || result?.artifact;
+      const text = typeof artifact === 'string' ? artifact : artifact?.text || artifact?.content || '';
+      if (text) showHubResult(text);
+    } catch (err) {
+      setBusy(false);
+      showHubResult(`Errore: ${err.message}`);
+    }
+  });
+
+  // Cancel running job
+  cancelBtn.addEventListener('click', () => {
+    const ids = HubJobService.activeJobIds();
+    ids.forEach(id => HubJobService.cancelJob(id));
+    setBusy(false);
+  });
+
+  // Insert result into editor
+  insertBtn.addEventListener('click', () => {
+    const text = resultText.textContent;
+    if (text) {
+      appendTextBlock(text);
+      updateWordCount();
+      scheduleSave();
+      blocksContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
+    }
+    hideHubResult();
+  });
+
+  // Dismiss result
+  dismissBtn.addEventListener('click', hideHubResult);
 }
 
 function renderEmpty(msg) {

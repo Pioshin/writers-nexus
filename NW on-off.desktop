@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Toggle Writers Nexus
+Exec=/home/pioshin/Scrivania/toggle-writers-nexus.sh
+Icon=network-server
+Terminal=true
+Type=Application
+Categories=Utility;

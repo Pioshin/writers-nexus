@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/pioshin/AI/writers_nexus/writers-nexus"
+APP_DIR="/home/pioshin/AI/Projects/P_NOOS/Writers_Nexus/WN_Frontend"
 PORT="55099"
 URL="http://127.0.0.1:${PORT}"
 LOG_FILE="${APP_DIR}/.writers-nexus-server.log"

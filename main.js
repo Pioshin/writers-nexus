@@ -3,6 +3,7 @@ import { DataManager } from './DataManager.js';
 import { ThemeManager } from './ThemeManager.js';
 import { AIService } from './ai/AIService.js';
 import { AIPanel } from './ai/AIPanel.js';
+import { HubJobService } from './ai/HubJobService.js';
 import { ConsistencyEngine } from './js/ConsistencyEngine.js';
 import { HubSync } from './HubSync.js';
 
@@ -137,6 +138,14 @@ async function initializeApp() {
   // ── NOOS Hub dual-write (M2) ──
   HubSync.install(DataManager);
   HubSync.configure(settings);
+
+  // ── NOOS Hub Job Service (Fase 2) ──
+  // HubJobService auto-resolves its client from HubSync.
+  // If hub is enabled, jobs are routed through NOOS workers (BKA/KRONK).
+  if (settings.hubEnabled) {
+    const hubClient = HubSync.getClient();
+    if (hubClient) HubJobService.configure(hubClient);
+  }
 
   const expectedOrigin = 'http://127.0.0.1:55099';
   if (window.location.origin !== expectedOrigin) {
@@ -446,6 +455,12 @@ async function onSettingsChanged() {
       }
 
       console.info('[AI] Re-inizializzata per modifica configurazione.');
+    }
+
+    // Re-configure Hub Job Service on settings change
+    if (s.hubEnabled) {
+      const hubClient = HubSync.getClient();
+      if (hubClient) HubJobService.configure(hubClient);
     }
   } catch (err) {
     console.warn('[AI] Aggiornamento configurazione fallito:', err);

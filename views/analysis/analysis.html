@@ -123,6 +123,40 @@
   </div>
 
   <div class="grid grid-cols-1 gap-6">
+    <!-- NOOS Hub AI Analysis Section -->
+    <section id="hub-analysis-section" class="hidden card-glass p-6 border-l-4 border-l-accent">
+      <h3 class="text-2xl font-display mb-4 flex items-center gap-2">
+        <i data-lucide="cpu" class="w-6 h-6 text-accent"></i>Analisi AI (NOOS Hub)
+      </h3>
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button id="hub-analyze-manuscript"
+          class="flex items-center gap-2 px-3 py-2 bg-accent/10 hover:bg-accent/25 border border-accent/30 rounded-lg text-sm text-accent transition-colors">
+          <i data-lucide="file-search" class="w-4 h-4"></i>Analizza Manoscritto
+        </button>
+        <button id="hub-analyze-consistency"
+          class="flex items-center gap-2 px-3 py-2 bg-accent/10 hover:bg-accent/25 border border-accent/30 rounded-lg text-sm text-accent transition-colors">
+          <i data-lucide="search" class="w-4 h-4"></i>Check Consistenza
+        </button>
+        <button id="hub-extract-entities"
+          class="flex items-center gap-2 px-3 py-2 bg-accent/10 hover:bg-accent/25 border border-accent/30 rounded-lg text-sm text-accent transition-colors">
+          <i data-lucide="tags" class="w-4 h-4"></i>Estrai Entità
+        </button>
+      </div>
+      <!-- Progress -->
+      <div id="hub-analysis-progress" class="hidden mb-4">
+        <div class="flex items-center gap-2 mb-1">
+          <i data-lucide="loader-2" class="w-4 h-4 text-accent animate-spin"></i>
+          <span id="hub-analysis-progress-label" class="text-xs text-accent font-semibold">Analisi in corso...</span>
+        </div>
+        <div class="w-full bg-primary/50 rounded-full h-1.5">
+          <div id="hub-analysis-progress-bar" class="bg-accent h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="hub-analysis-progress-msg" class="text-[10px] text-secondary mt-1">In attesa...</p>
+      </div>
+      <!-- Results -->
+      <div id="hub-analysis-result" class="hidden bg-primary/30 border border-white/5 rounded-lg p-4 text-sm whitespace-pre-wrap max-h-[500px] overflow-y-auto custom-scrollbar"></div>
+    </section>
+
     <section class="card-glass p-6 border-l-4 border-l-yellow-500/50">
       <h3 class="text-2xl font-display mb-2 flex items-center gap-2">
         <i data-lucide="alert-circle" class="w-6 h-6 text-yellow-500"></i>Controllo Sequenza Temporale

@@ -1,5 +1,101 @@
-<div id="view-editing" class="view-content">
-  <div class="border-b border-accent/20 mb-6 pb-4">
+<div id="view-editing" class="view-content p-6 h-full flex flex-col">
+  <!-- Header -->
+  <div class="border-b border-accent/20 mb-4 pb-4 flex flex-wrap items-center justify-between gap-3">
     <h2 class="text-4xl font-display">Editing</h2>
+    <div class="flex items-center gap-3">
+      <select id="editing-scene-select"
+        class="bg-primary border border-accent/30 rounded-lg px-3 py-2 text-sm min-w-[220px]">
+        <option value="">— Seleziona scena —</option>
+      </select>
+      <div id="editing-hub-status" class="flex items-center gap-1 text-xs text-secondary">
+        <span id="editing-hub-dot" class="w-2 h-2 rounded-full bg-zinc-500 inline-block"></span>
+        <span id="editing-hub-label">Hub offline</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hub Actions Toolbar -->
+  <div id="editing-hub-toolbar" class="hidden mb-4 flex flex-wrap items-center gap-2 p-3 bg-secondary border border-accent/20 rounded-lg">
+    <span class="text-xs text-secondary mr-2 uppercase tracking-wider">NOOS Hub:</span>
+    <button id="editing-btn-revise"
+      class="hub-edit-btn flex items-center gap-2 px-3 py-1.5 bg-accent/10 hover:bg-accent/25 border border-accent/30 rounded-lg text-xs text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Revisiona Capitolo
+    </button>
+    <button id="editing-btn-rewrite"
+      class="hub-edit-btn flex items-center gap-2 px-3 py-1.5 bg-accent/10 hover:bg-accent/25 border border-accent/30 rounded-lg text-xs text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+      <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i>Riscrivi Sezione
+    </button>
+    <div class="flex-1"></div>
+    <div id="editing-instructions-wrap" class="flex items-center gap-2">
+      <input id="editing-instructions" type="text" placeholder="Istruzioni aggiuntive (opzionale)"
+        class="bg-primary/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs w-56 focus:outline-none focus:border-accent">
+      <select id="editing-focus-areas" class="bg-primary/50 border border-white/10 rounded-lg px-2 py-1.5 text-xs">
+        <option value="all">Tutto</option>
+        <option value="style">Stile</option>
+        <option value="pacing">Ritmo</option>
+        <option value="coherence">Coerenza</option>
+        <option value="dialogue">Dialoghi</option>
+      </select>
+    </div>
+    <button id="editing-btn-cancel" class="hidden px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs hover:bg-red-500/30">
+      <i data-lucide="x" class="w-3.5 h-3.5 inline"></i> Annulla
+    </button>
+  </div>
+
+  <!-- Progress bar -->
+  <div id="editing-progress-wrap" class="hidden mb-4">
+    <div class="flex items-center gap-2 mb-1">
+      <i data-lucide="loader-2" class="w-4 h-4 text-accent animate-spin"></i>
+      <span id="editing-progress-label" class="text-xs text-accent font-semibold">Elaborazione...</span>
+    </div>
+    <div class="w-full bg-primary/50 rounded-full h-1.5">
+      <div id="editing-progress-bar" class="bg-accent h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+    </div>
+    <p id="editing-progress-msg" class="text-[10px] text-secondary mt-1">In attesa...</p>
+  </div>
+
+  <!-- Main content: split pane -->
+  <div class="flex-1 flex min-h-0 gap-4">
+    <!-- Left: Original text -->
+    <section class="flex-1 flex flex-col min-w-0">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-secondary flex items-center gap-2">
+          <i data-lucide="file-text" class="w-4 h-4"></i>Testo Originale
+        </h3>
+        <span id="editing-scene-title" class="text-xs text-secondary"></span>
+      </div>
+      <div id="editing-original-text"
+        class="flex-1 overflow-y-auto p-4 bg-secondary border border-accent/10 rounded-lg text-sm leading-7 whitespace-pre-wrap custom-scrollbar">
+        <p class="text-secondary italic">Seleziona una scena dal menu in alto per iniziare l'editing.</p>
+      </div>
+      <div class="flex items-center gap-4 mt-2 text-xs text-secondary">
+        <span>Parole: <strong id="editing-word-count">0</strong></span>
+        <span>Caratteri: <strong id="editing-char-count">0</strong></span>
+      </div>
+    </section>
+
+    <!-- Right: Revised text (Hub result) -->
+    <section id="editing-result-pane" class="flex-1 flex flex-col min-w-0 hidden">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-accent flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>Proposta Revisione
+        </h3>
+        <div class="flex gap-2">
+          <button id="editing-btn-apply" class="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs hover:bg-green-500/30">
+            <i data-lucide="check" class="w-3 h-3 inline"></i> Applica
+          </button>
+          <button id="editing-btn-discard" class="px-2 py-1 bg-primary/50 border border-white/10 rounded text-xs hover:bg-red-500/10">
+            <i data-lucide="x" class="w-3 h-3 inline"></i> Scarta
+          </button>
+        </div>
+      </div>
+      <div id="editing-result-text"
+        class="flex-1 overflow-y-auto p-4 bg-secondary border border-accent/30 rounded-lg text-sm leading-7 whitespace-pre-wrap custom-scrollbar">
+      </div>
+      <div class="flex items-center gap-4 mt-2 text-xs text-secondary">
+        <span>Parole: <strong id="editing-result-word-count">0</strong></span>
+        <span id="editing-quality-flags" class="text-accent"></span>
+      </div>
+    </section>
   </div>
 </div>
